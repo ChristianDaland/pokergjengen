@@ -17,7 +17,57 @@
       align-items: center;
       min-height: 100vh;
       box-sizing: border-box;
+      position: relative;
     }
+
+    /* Hamburgermeny */
+    .menu-container {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      z-index: 100;
+    }
+
+    .hamburger-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: white;
+      font-size: 1.4rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 45px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      width: 220px;
+      overflow: hidden;
+    }
+
+    .dropdown-menu.show {
+      display: block;
+    }
+
+    .dropdown-menu a {
+      display: block;
+      padding: 12px 16px;
+      color: #f8fafc;
+      text-decoration: none;
+      font-size: 0.95rem;
+      border-bottom: 1px solid #334155;
+    }
+
+    .dropdown-menu a:hover {
+      background: #334155;
+    }
+
     .card-box {
       background: #1e293b;
       border: 1px solid #334155;
@@ -27,7 +77,9 @@
       max-width: 400px;
       text-align: center;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      margin-top: 40px;
     }
+
     input, select, button {
       width: 100%;
       padding: 12px;
@@ -39,6 +91,7 @@
       font-size: 1rem;
       box-sizing: border-box;
     }
+
     button {
       background: #2563eb;
       font-weight: bold;
@@ -46,6 +99,7 @@
       cursor: pointer;
       margin-top: 15px;
     }
+
     .cards-container {
       display: flex;
       justify-content: center;
@@ -53,6 +107,7 @@
       margin-top: 20px;
       flex-wrap: wrap;
     }
+
     .playing-card {
       background: #ffffff;
       color: #0f172a;
@@ -67,6 +122,7 @@
       border: 1px solid #cbd5e1;
       box-shadow: 0 4px 8px rgba(0,0,0,0.4);
     }
+
     .badge {
       display: inline-block;
       background: #ffd700;
@@ -80,6 +136,15 @@
   </style>
 </head>
 <body>
+
+  <!-- Hamburgermeny -->
+  <div class="menu-container">
+    <button class="hamburger-btn" onclick="toggleMenu()">☰</button>
+    <div class="dropdown-menu" id="dropdown-menu">
+      <a href="/board" target="_blank">🖥️ Åpne Bordvisning</a>
+      <a href="#" onclick="changeUser()">👤 Bytt Bruker</a>
+    </div>
+  </div>
 
   <div class="card-box" id="login-section">
     <h2 style="color: #ffd700; margin-top: 0;">♠️ Bli med på spillet ♥️</h2>
@@ -110,6 +175,15 @@
 
     if (myName) {
       autoJoin(myName);
+    }
+
+    function toggleMenu() {
+      document.getElementById('dropdown-menu').classList.toggle('show');
+    }
+
+    function changeUser() {
+      localStorage.removeItem('poker_player_name');
+      location.reload();
     }
 
     function joinGame() {

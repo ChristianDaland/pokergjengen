@@ -9,6 +9,11 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
+// Ruting for bordvisning
+app.get('/board', (req, res) => {
+  res.sendFile(__dirname + '/public/board.html');
+});
+
 const SUITS = ['c', 'd', 'h', 's'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
@@ -318,10 +323,8 @@ function buildStatePayload() {
 }
 
 function updateAll() {
-  // Broadcast generell status til alle
   io.emit('state_update', buildStatePayload());
 
-  // Send de private kortene spesifikt til hver enkelt spiller sin mobil-socket
   Object.values(players).forEach(p => {
     if (p.socketId) {
       io.to(p.socketId).emit('your_cards', {
