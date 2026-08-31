@@ -97,17 +97,37 @@ function translateHandDescription(descr) {
   return text;
 }
 
+// Konverterer kortverdi-bokstaver fra pokersolver til rene tall
+function cardValueToNumber(val) {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const str = String(val).toUpperCase();
+  if (str === 'A') return 14;
+  if (str === 'K') return 13;
+  if (str === 'Q') return 12;
+  if (str === 'J') return 11;
+  if (str === 'T' || str === '10') return 10;
+  return parseInt(str, 10) || 0;
+}
+
+// Beregner en presis og matematisk korrekt poengsum for rangering
 function calculateHandScore(solvedHand) {
   if (!solvedHand) return 0;
+
+  // Hovedkategori (0-9): High Card (1), Pair (2)... Straight Flush (9)
   let rank = Number(solvedHand.rank) || 0;
-  let score = rank * 10000000;
+  let score = rank * 10000000000;
+
+  // Henter ut verdiene fra pokersolver i riktig rangert rekkefølge
   if (solvedHand.values && Array.isArray(solvedHand.values)) {
-    let multiplier = 100000;
+    let multiplier = 100000000;
     for (let val of solvedHand.values) {
-      score += (Number(val) || 0) * multiplier;
+      const numericVal = cardValueToNumber(val);
+      score += numericVal * multiplier;
       multiplier = Math.floor(multiplier / 15);
     }
   }
+
   return Math.floor(score);
 }
 
@@ -246,7 +266,6 @@ function formatToNorwegianTime(dateInput) {
 }
 
 io.on('connection', (socket) => {
-  // VIKTIG: Sender liste over forhåndsdefinerte spillere til klienten med en gang koblende skjer
   sendPresetPlayers(socket);
 
   socket.on('toggle_player_eliminated', (targetPlayerId) => {
@@ -388,6 +407,8 @@ io.on('connection', (socket) => {
         const rawDescr = topWinner && topWinner.solved ? topWinner.solved.descr : 'Ukjent hånd';
         const translatedHand = translateHandDescription(rawDescr);
         const handRank = (topWinner && topWinner.solved && topWinner.solved.rank) ? Number(topWinner.solved.rank) : 0;
+        
+        // Beregn korrekt numerisk poengsum
         const handScore = topWinner && topWinner.solved ? calculateHandScore(topWinner.solved) : 0;
 
         gameState.winnerInfo = {
