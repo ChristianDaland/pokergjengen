@@ -37,7 +37,6 @@ function formatForSolver(card) {
 
 function translateHandDescription(descr) {
   let text = descr;
-
   text = text.replace(/\bT\b/g, '10');
   text = text.replace(/Straight Flush/g, 'Straight Flush');
   text = text.replace(/Four of a Kind/g, 'Fire like');
@@ -48,12 +47,10 @@ function translateHandDescription(descr) {
   text = text.replace(/Two Pair/g, 'To Par');
   text = text.replace(/Pair/g, 'Ett Par');
   text = text.replace(/High Card/g, 'Høyt Kort');
-
   text = text.replace(/Spades/g, 'Spar');
   text = text.replace(/Hearts/g, 'Hjerter');
   text = text.replace(/Diamonds/g, 'Ruter');
   text = text.replace(/Clubs/g, 'Kløver');
-
   return text;
 }
 
@@ -94,7 +91,9 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
 }
 
 let gameState = {
-  gameMode: null,
+  sessionStarted: false,
+  hostName: 'Odd Christian',
+  gameMode: 'OMAHA',
   phase: 'VENTING',
   board: [],
   deck: [],
@@ -105,7 +104,27 @@ let gameState = {
 let players = {};
 const disconnectTimeouts = {};
 
-// Hjelpefunksjon for å stokke om rekkefølgen på spillerne i `players`-objektet
+function addPlayerByName(name) {
+  const cleanName = name ? name.trim() : 'Spiller';
+  let existingKey = Object.keys(players).find(
+    k => players[k].name.toLowerCase() === cleanName.toLowerCase()
+  );
+
+  if (!existingKey) {
+    const seatNumber = Object.keys(players).length + 1;
+    const fakeId = 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    players[fakeId] = {
+      id: fakeId,
+      name: cleanName,
+      seat: seatNumber,
+      cards: [],
+      folded: false,
+      role: '',
+      connected: true
+    };
+  }
+}
+
 function randomizePlayerSeats() {
   const playerArray = Object.values(players);
   if (playerArray.length <= 1) return;
@@ -119,7 +138,7 @@ function randomizePlayerSeats() {
   });
 
   players = newPlayersObj;
-  gameState.dealerIndex = 0; // Nullstill dealerknapp til første plass
+  gameState.dealerIndex = 0;
 }
 
 function startNewHandLogic() {
@@ -157,68 +176,39 @@ function startNewHandLogic() {
 
 io.on('connection', (socket) => {
 
-  /* --- NYE EVENTS FOR MOBIL OG DASBOARD INTEGRASJON --- */
+  // Støtte for mobil-event "playerJoined"
   socket.on('playerJoined', (data) => {
-    // Videreformidle at en spiller har valgt navnet sitt på mobilen
-    io.emit('playerJoined', data);
-  });
-
-  socket.on('cardsScanned', (data) => {
-    // Videreformidle at en spiller har skannet/skrevet inn sine kort fra mobilen
-    io.emit('cardsScanned', data);
-  });
-
-  socket.on('startSession', (sessionData) => {
-    // Videreformidle at verten har startet spillekvelden
-    io.emit('sessionStarted', sessionData);
-  });
-
-  /* --- EKSISTERENDE KORT- OG SPILLELOGIKK --- */
-  socket.on('join_game', (name) => {
-    const cleanName = name ? name.trim() : 'Spiller';
-    
-    let existingPlayerKey = Object.keys(players).find(
-      key => players[key].name.toLowerCase() === cleanName.toLowerCase()
-    );
-
-    if (existingPlayerKey) {
-      const playerData = players[existingPlayerKey];
-      delete players[existingPlayerKey];
-      
-      if (disconnectTimeouts[existingPlayerKey]) {
-        clearTimeout(disconnectTimeouts[existingPlayerKey]);
-        delete disconnectTimeouts[existingPlayerKey];
-      }
-
-      playerData.id = socket.id;
-      playerData.connected = true;
-      players[socket.id] = playerData;
-    } else {
-      const seatNumber = Object.keys(players).length + 1;
-      players[socket.id] = {
-        id: socket.id,
-        name: cleanName,
-        seat: seatNumber,
-        cards: [],
-        folded: false,
-        role: '',
-        connected: true
-      };
+    if (data && data.playerName) {
+      addPlayerByName(data.playerName);
+      updateAll();
     }
+  });
 
+  socket.on('join_game', (name) => {
+    addPlayerByName(name);
+    updateAll();
+  });
+
+  socket.on('start_session', (data) => {
+    gameState.sessionStarted = true;
+    if (data && data.hostName) gameState.hostName = data.hostName;
+    if (data && data.gameMode) gameState.gameMode = data.gameMode;
+    randomizePlayerSeats();
+    updateAll();
+  });
+
+  socket.on('reset_session', () => {
+    gameState.sessionStarted = false;
+    gameState.phase = 'VENTING';
+    gameState.board = [];
+    gameState.winnerInfo = null;
+    players = {};
     updateAll();
   });
 
   socket.on('set_game_mode', (mode) => {
     gameState.gameMode = mode;
-    if (!mode) {
-      gameState.phase = 'VENTING';
-      gameState.board = [];
-      gameState.winnerInfo = null;
-    } else {
-      // Stokker plassene til alle spillere når en spilletype velges
-      randomizePlayerSeats();
-    }
+    randomizePlayerSeats();
     updateAll();
   });
 
@@ -288,47 +278,19 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
-  socket.on('player_fold', () => {
-    if (players[socket.id]) {
-      players[socket.id].folded = true;
-      
-      const activePlayers = Object.values(players).filter(p => !p.folded);
-      if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
-        gameState.phase = 'FINISHED';
-        gameState.winnerInfo = {
-          winnerName: activePlayers[0].name,
-          descr: 'Alle andre kastet seg',
-          foldedWin: true
-        };
-      }
-      updateAll();
-    }
-  });
-
-  socket.on('disconnect', () => {
-    if (players[socket.id]) {
-      players[socket.id].connected = false;
-      const disconnectedId = socket.id;
-
-      disconnectTimeouts[disconnectedId] = setTimeout(() => {
-        delete players[disconnectedId];
-        delete disconnectTimeouts[disconnectedId];
-        updateAll();
-      }, 45000);
-
-      updateAll();
-    }
-  });
+  // Send initial-tilstand ved tilkobling
+  socket.emit('state_update', buildStatePayload());
 });
 
-function updateAll() {
+function buildStatePayload() {
   const playerList = Object.values(players);
-
   const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && 
                             gameState.winnerInfo && 
                             !gameState.winnerInfo.foldedWin;
 
-  io.emit('state_update', {
+  return {
+    sessionStarted: gameState.sessionStarted,
+    hostName: gameState.hostName,
     gameMode: gameState.gameMode,
     phase: gameState.phase,
     board: gameState.board,
@@ -341,19 +303,11 @@ function updateAll() {
       connected: p.connected,
       cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
-  });
+  };
+}
 
-  playerList.forEach(p => {
-    if (p.connected) {
-      io.to(p.id).emit('player_state', {
-        phase: gameState.phase,
-        cards: p.cards,
-        role: p.role,
-        folded: p.folded,
-        winnerInfo: gameState.winnerInfo
-      });
-    }
-  });
+function updateAll() {
+  io.emit('state_update', buildStatePayload());
 }
 
 const PORT = process.env.PORT || 3000;
