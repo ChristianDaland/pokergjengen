@@ -11,6 +11,7 @@ app.use(express.static('public'));
 
 const SUITS = ['c', 'd', 'h', 's'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
+const PRESET_PLAYERS = ['Direktøren', 'Spiller 2', 'Spiller 3', 'Spiller 4', 'Spiller 5'];
 
 function createDeck() {
   const deck = [];
@@ -31,13 +32,8 @@ function shuffle(array) {
   return deck;
 }
 
-function formatForSolver(card) {
-  return card;
-}
-
 function translateHandDescription(descr) {
   let text = descr;
-
   text = text.replace(/\bT\b/g, '10');
   text = text.replace(/Straight Flush/g, 'Straight Flush');
   text = text.replace(/Four of a Kind/g, 'Fire like');
@@ -53,27 +49,22 @@ function translateHandDescription(descr) {
   text = text.replace(/Hearts/g, 'Hjerter');
   text = text.replace(/Diamonds/g, 'Ruter');
   text = text.replace(/Clubs/g, 'Kløver');
-
   return text;
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
-  const formattedBoard = boardCards.map(formatForSolver);
-  const formattedPlayer = playerCards.map(formatForSolver);
-
   if (gameMode === 'TEXAS') {
-    const allCards = [...formattedPlayer, ...formattedBoard];
-    return Hand.solve(allCards);
+    return Hand.solve([...playerCards, ...boardCards]);
   } else {
     let bestHand = null;
-    for (let i = 0; i < formattedPlayer.length; i++) {
-      for (let j = i + 1; j < formattedPlayer.length; j++) {
-        const hand2 = [formattedPlayer[i], formattedPlayer[j]];
+    for (let i = 0; i < playerCards.length; i++) {
+      for (let j = i + 1; j < playerCards.length; j++) {
+        const hand2 = [playerCards[i], playerCards[j]];
 
-        for (let b1 = 0; b1 < formattedBoard.length; b1++) {
-          for (let b2 = b1 + 1; b2 < formattedBoard.length; b2++) {
-            for (let b3 = b2 + 1; b3 < formattedBoard.length; b3++) {
-              const board3 = [formattedBoard[b1], formattedBoard[b2], formattedBoard[b3]];
+        for (let b1 = 0; b1 < boardCards.length; b1++) {
+          for (let b2 = b1 + 1; b2 < boardCards.length; b2++) {
+            for (let b3 = b2 + 1; b3 < boardCards.length; b3++) {
+              const board3 = [boardCards[b1], boardCards[b2], boardCards[b3]];
               const combo = Hand.solve([...hand2, ...board3]);
               
               if (!bestHand) {
@@ -100,8 +91,11 @@ let gameState = {
   deck: [],
   winnerInfo: null,
   dealerIndex: 0,
-  leaderboard: [],
-  gameNightStats: {}
+  gameNight: {
+    host: '',
+    location: '',
+    date: new Date().toISOString().split('T')[0]
+  }
 };
 
 let players = {};
@@ -157,6 +151,8 @@ function startNewHandLogic() {
 }
 
 io.on('connection', (socket) => {
+  socket.emit('preset_players', PRESET_PLAYERS);
+
   socket.on('join_game', (name) => {
     const cleanName = name ? name.trim() : 'Spiller';
     
@@ -190,6 +186,12 @@ io.on('connection', (socket) => {
       };
     }
 
+    updateAll();
+  });
+
+  socket.on('set_gamenight', (data) => {
+    gameState.gameNight.host = data.host || '';
+    gameState.gameNight.location = data.location || '';
     updateAll();
   });
 
@@ -250,7 +252,6 @@ io.on('connection', (socket) => {
 
       const handsOnly = solvedHands.map(sh => sh.solved);
       const winningHands = Hand.winners(handsOnly);
-      
       const winners = solvedHands.filter(sh => winningHands.includes(sh.solved));
       
       let winnerText = '';
@@ -279,7 +280,6 @@ io.on('connection', (socket) => {
   socket.on('player_fold', () => {
     if (players[socket.id]) {
       players[socket.id].folded = true;
-      
       const activePlayers = Object.values(players).filter(p => !p.folded);
       if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
         gameState.phase = 'FINISHED';
@@ -312,18 +312,14 @@ io.on('connection', (socket) => {
 
 function updateAll() {
   const playerList = Object.values(players);
-
-  const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && 
-                            gameState.winnerInfo && 
-                            !gameState.winnerInfo.foldedWin;
+  const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && gameState.winnerInfo && !gameState.winnerInfo.foldedWin;
 
   io.emit('state_update', {
     gameMode: gameState.gameMode,
     phase: gameState.phase,
     board: gameState.board,
     winnerInfo: gameState.winnerInfo,
-    leaderboard: gameState.leaderboard,
-    gameNightStats: gameState.gameNightStats,
+    gameNight: gameState.gameNight,
     players: playerList.map(p => ({
       id: p.id,
       name: p.name,

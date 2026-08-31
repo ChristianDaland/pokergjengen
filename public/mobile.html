@@ -79,10 +79,6 @@
       touch-action: manipulation;
     }
 
-    .cards-container:active {
-      background: #25663d;
-    }
-
     .card {
       display: inline-flex;
       flex-direction: column;
@@ -113,17 +109,21 @@
     .card-suit { font-size: 2.1rem; line-height: 1; }
 
     .join-box {
-      margin-top: 50px;
+      margin-top: 30px;
     }
-    input[type="text"] {
-      width: 80%;
+
+    select, input[type="text"] {
+      width: 85%;
       padding: 12px;
       font-size: 1.1rem;
       border-radius: 8px;
       border: 1px solid #ccc;
       margin-bottom: 15px;
       text-align: center;
+      background: #ffffff;
+      color: #333333;
     }
+
     .btn-join {
       padding: 12px 30px;
       font-size: 1.1rem;
@@ -132,6 +132,7 @@
       border: none;
       border-radius: 8px;
       font-weight: bold;
+      cursor: pointer;
     }
 
     .instruction-text {
@@ -145,8 +146,16 @@
 
   <div id="login-screen" class="join-box">
     <h2>Velkommen til Pokerbordet</h2>
-    <p>Skriv inn navnet ditt for å koble til:</p>
-    <input type="text" id="player-name" placeholder="Ditt navn" maxlength="15" />
+    <p>Velg ditt navn eller skriv inn nytt:</p>
+
+    <select id="player-select" onchange="toggleCustomInput()">
+      <option value="">-- Velg spiller --</option>
+    </select>
+
+    <div id="custom-name-container" style="display: none;">
+      <input type="text" id="player-name-custom" placeholder="Skriv inn navn" maxlength="15" />
+    </div>
+
     <br>
     <button class="btn-join" onclick="joinGame()">Koble til</button>
   </div>
@@ -179,11 +188,44 @@
     let myCardsData = [];
     let isShowingCards = false;
 
-    function joinGame() {
-      const name = document.getElementById('player-name').value.trim();
-      if (!name) return alert('Vennligst skriv inn et navn!');
+    socket.on('preset_players', (presets) => {
+      const select = document.getElementById('player-select');
+      select.innerHTML = '<option value="">-- Velg spiller --</option>';
+      presets.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.innerText = name;
+        select.appendChild(opt);
+      });
+      const customOpt = document.createElement('option');
+      customOpt.value = '__CUSTOM__';
+      customOpt.innerText = '➕ Skriv annet navn...';
+      select.appendChild(customOpt);
+    });
 
-      socket.emit('join_game', name);
+    function toggleCustomInput() {
+      const selectVal = document.getElementById('player-select').value;
+      const customContainer = document.getElementById('custom-name-container');
+      if (selectVal === '__CUSTOM__') {
+        customContainer.style.display = 'block';
+      } else {
+        customContainer.style.display = 'none';
+      }
+    }
+
+    function joinGame() {
+      const selectVal = document.getElementById('player-select').value;
+      let finalName = '';
+
+      if (selectVal === '__CUSTOM__') {
+        finalName = document.getElementById('player-name-custom').value.trim();
+      } else {
+        finalName = selectVal;
+      }
+
+      if (!finalName) return alert('Vennligst velg eller skriv inn et navn!');
+
+      socket.emit('join_game', finalName);
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('game-screen').style.display = 'block';
     }

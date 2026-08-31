@@ -54,8 +54,6 @@
       padding: 0;
     }
 
-    .zoom-btn:hover { background: #2196f3; }
-
     .board-wrapper {
       transform-origin: center center;
       transition: transform 0.15s ease-out;
@@ -194,7 +192,6 @@
       if (isNaN(val)) return '';
 
       const positions = [];
-
       if (val === 2) {
         positions.push({ x: 50, y: 15 }, { x: 50, y: 85, flip: true });
       } else if (val === 3) {

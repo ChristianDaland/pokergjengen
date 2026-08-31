@@ -18,8 +18,29 @@
     }
 
     h1 {
-      margin: 5px 0 10px 0;
+      margin: 5px 0 5px 0;
       font-size: 1.8rem;
+    }
+
+    .gamenight-info {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 6px 14px;
+      display: inline-flex;
+      gap: 15px;
+      align-items: center;
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+    }
+
+    .gamenight-info input {
+      background: #333;
+      border: 1px solid #555;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.85rem;
     }
 
     .winner-banner {
@@ -86,18 +107,20 @@
       margin: 10px 0;
     }
 
+    /* KORT DESIGN FOR DEALER SKJERM (Forenklet midt-grafikk for ren plassering) */
     .card {
       display: inline-flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       background-color: #ffffff;
-      border-radius: 10px;
-      width: 70px;
-      height: 100px;
+      border-radius: 8px;
+      width: 65px;
+      height: 95px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       font-weight: bold;
       position: relative;
+      padding: 4px;
       user-select: none;
     }
 
@@ -105,46 +128,24 @@
     .card.black { color: #222222; }
 
     .card-corner {
-      position: absolute;
       display: flex;
       flex-direction: column;
       align-items: center;
       line-height: 1;
     }
-    .card-corner.top-left { top: 6px; left: 6px; }
-    .card-corner.bottom-right { bottom: 6px; right: 6px; transform: rotate(180deg); }
+    .card-corner.top-left { align-self: flex-start; }
+    .card-corner.bottom-right { align-self: flex-end; transform: rotate(180deg); }
 
-    .card-corner .val { font-size: 0.95rem; font-weight: bold; }
-    .card-corner .suit { font-size: 0.85rem; }
+    .card-corner .val { font-size: 0.9rem; font-weight: bold; }
+    .card-corner .suit { font-size: 0.8rem; }
 
-    .card-center-graphic {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .pip-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-    }
-
-    .pip {
+    .card-center-symbol {
+      font-size: 1.8rem;
+      line-height: 1;
       position: absolute;
-      font-size: 0.85rem;
+      top: 50%;
+      left: 50%;
       transform: translate(-50%, -50%);
-    }
-
-    .pip.flip {
-      transform: translate(-50%, -50%) rotate(180deg);
-    }
-
-    .face-text {
-      font-size: 0.75rem;
-      font-weight: bold;
-      opacity: 0.8;
     }
 
     .players-container {
@@ -231,9 +232,6 @@
       border-radius: 10px;
       box-shadow: 0 3px 8px rgba(0,0,0,0.4);
     }
-    .btn-open-board:hover {
-      background-color: #f57c00;
-    }
 
     .btn-next-large {
       background: linear-gradient(135deg, #1e88e5, #1565c0);
@@ -243,21 +241,21 @@
       width: 100%;
       border-radius: 16px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      letter-spacing: 0.5px;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-    }
-    .btn-next-large:hover:not(:disabled) {
-      transform: scale(1.02);
-      background: linear-gradient(135deg, #2196f3, #1e88e5);
     }
   </style>
 </head>
 <body>
 
   <h1>Løland Gård Poker</h1>
+
+  <div class="gamenight-info">
+    <span>🏠 Vert: <input type="text" id="gn-host" placeholder="F.eks. Direktøren" onchange="saveGameNightInfo()"></span>
+    <span>📍 Sted: <input type="text" id="gn-location" placeholder="F.eks. Stua / Gården" onchange="saveGameNightInfo()"></span>
+  </div>
 
   <div id="winner-banner" class="winner-banner" style="display: none;"></div>
 
@@ -296,7 +294,7 @@
       <button class="btn-help" onclick="openHelpWindow()">📖 Spilleveiledning</button>
     </div>
 
-    <div class="version-tag">Versjon 2.10</div>
+    <div class="version-tag">Versjon 2.11</div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -310,30 +308,10 @@
       height: 95
     });
 
-    function renderPips(rawVal, suitSymbol) {
-      if (rawVal === 'A') {
-        return `<div class="pip-container"><div class="pip" style="top: 50%; left: 50%; font-size: 2.2rem;">${suitSymbol}</div></div>`;
-      }
-      const val = parseInt(rawVal === 'T' ? '10' : rawVal, 10);
-      if (isNaN(val)) return '';
-
-      const positions = [];
-      if (val === 2) positions.push({ x: 50, y: 15 }, { x: 50, y: 85, flip: true });
-      else if (val === 3) positions.push({ x: 50, y: 15 }, { x: 50, y: 50 }, { x: 50, y: 85, flip: true });
-      else if (val === 4) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
-      else if (val === 5) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 50, y: 50 }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
-      else if (val === 6) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 25, y: 50 }, { x: 75, y: 50 }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
-      else if (val === 7) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 50, y: 32.5 }, { x: 25, y: 50 }, { x: 75, y: 50 }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
-      else if (val === 8) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 50, y: 32.5 }, { x: 25, y: 50 }, { x: 75, y: 50 }, { x: 50, y: 67.5, flip: true }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
-      else if (val === 9) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 25, y: 38 }, { x: 75, y: 38 }, { x: 50, y: 50 }, { x: 25, y: 62, flip: true }, { x: 75, y: 62, flip: true }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
-      else if (val === 10) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 50, y: 27.5 }, { x: 25, y: 38 }, { x: 75, y: 38 }, { x: 25, y: 62, flip: true }, { x: 75, y: 62, flip: true }, { x: 50, y: 72.5, flip: true }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
-
-      let html = '<div class="pip-container">';
-      positions.forEach(p => {
-        html += `<div class="pip ${p.flip ? 'flip' : ''}" style="top: ${p.y}%; left: ${p.x}%;">${suitSymbol}</div>`;
-      });
-      html += '</div>';
-      return html;
+    function saveGameNightInfo() {
+      const host = document.getElementById('gn-host').value;
+      const location = document.getElementById('gn-location').value;
+      socket.emit('set_gamenight', { host, location });
     }
 
     function formatCard(cardCode) {
@@ -351,23 +329,13 @@
       
       const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
 
-      const faceGraphics = {
-        'J': '<div class="face-text">KNEKT</div>',
-        'Q': '<div class="face-text">DRONNING</div>',
-        'K': '<div class="face-text">KONGE</div>'
-      };
-
-      let centerHTML = faceGraphics[rawVal] ? faceGraphics[rawVal] : renderPips(rawVal, suit.symbol);
-
       return `
         <div class="card ${suit.color}">
           <div class="card-corner top-left">
             <span class="val">${displayVal}</span>
             <span class="suit">${suit.symbol}</span>
           </div>
-          <div class="card-center-graphic">
-            ${centerHTML}
-          </div>
+          <div class="card-center-symbol">${suit.symbol}</div>
           <div class="card-corner bottom-right">
             <span class="val">${displayVal}</span>
             <span class="suit">${suit.symbol}</span>
@@ -390,6 +358,15 @@
     }
 
     socket.on('state_update', (state) => {
+      if (state.gameNight) {
+        if (document.activeElement.id !== 'gn-host') {
+          document.getElementById('gn-host').value = state.gameNight.host || '';
+        }
+        if (document.activeElement.id !== 'gn-location') {
+          document.getElementById('gn-location').value = state.gameNight.location || '';
+        }
+      }
+
       const modeSelection = document.getElementById('mode-selection');
       const gameControls = document.getElementById('game-controls');
       const gameInfo = document.getElementById('game-info');
