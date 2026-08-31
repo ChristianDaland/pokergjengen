@@ -18,7 +18,7 @@ const DEFAULT_PLAYERS = ['Einar', 'Kai', 'Ronny', 'Joakim', 'Odd Christian'];
 
 async function initDB() {
   try {
-    // 1. Tabell for hånd-historikk
+    // 1. Tabell for hånd-historikk med ren hand_score (BIGINT/INT)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS hand_history (
         id SERIAL PRIMARY KEY,
@@ -104,24 +104,24 @@ function translateHandDescription(descr) {
   return text;
 }
 
-// Genererer en unikk matematisk score basert på kortverdiene i den løste hånden
+// Beregner en unikk og sammenlignbar poengsum med vanlige tall
 function calculateHandScore(solvedHand) {
   if (!solvedHand) return 0;
-  
-  // Hovedrangering (0-9) multipliseres med en stor faktormengde
-  let baseRank = solvedHand.rank || 0;
-  let score = BigInt(baseRank) * BigInt(10000000000);
 
-  // pokersolver setter 'values' som numeriske verdier (2-14) sortert etter viktighet
+  // Hovedkategori (0-9) vektes høyest (f.eks. 9 * 10 000 000)
+  let rank = solvedHand.rank || 0;
+  let score = rank * 10000000;
+
+  // pokersolver returnerer 'values' i synkende rekkefølge
   if (solvedHand.values && Array.isArray(solvedHand.values)) {
-    let multiplier = BigInt(100000000);
+    let multiplier = 100000;
     for (let val of solvedHand.values) {
-      score += BigInt(val) * multiplier;
-      multiplier /= BigInt(15);
+      score += Number(val) * multiplier;
+      multiplier = Math.floor(multiplier / 15);
     }
   }
 
-  return score.toString();
+  return score;
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
@@ -323,12 +323,14 @@ io.on('connection', (socket) => {
   socket.on('next_phase', async () => {
     const activePlayers = Object.values(players).filter(p => !p.folded);
 
+    // Hvis spillet er ferdig eller i Showdown, vil neste klikk alltid starte en ny hånd
     if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
       startNewHandLogic();
       updateAll();
       return;
     }
 
+    // Hvis alle unntatt én har kastet seg
     if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
       gameState.phase = 'FINISHED';
       gameState.winnerInfo = {
@@ -341,6 +343,7 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Stegvis utdeling av bordkort
     if (gameState.phase === 'PREFLOP') {
       gameState.phase = 'FLOP';
       gameState.board = [gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop()];
@@ -353,47 +356,52 @@ io.on('connection', (socket) => {
     } else if (gameState.phase === 'RIVER') {
       gameState.phase = 'SHOWDOWN';
       
-      const solvedHands = activePlayers.map(p => ({
-        player: p,
-        solved: evaluatePlayerHand(p.cards, gameState.board, gameState.gameMode)
-      }));
-
-      const handsOnly = solvedHands.map(sh => sh.solved);
-      const winningHands = Hand.winners(handsOnly);
-      const winners = solvedHands.filter(sh => winningHands.includes(sh.solved));
-      
-      let winnerText = '';
-      if (winners.length > 1) {
-        const names = winners.map(w => w.player.name).join(' & ');
-        winnerText = `UAVGJOERT / DELING: ${names}`;
-        winners.forEach(w => {
-          w.player.points = (w.player.points || 0) + 1;
-        });
-      } else {
-        winnerText = winners[0].player.name;
-        winners[0].player.points = (winners[0].player.points || 0) + 2;
-      }
-
-      const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
-      const translatedHand = translateHandDescription(rawDescr);
-      const handRank = winners[0] && winners[0].solved ? (winners[0].solved.rank || 0) : 0;
-      const handScore = winners[0] && winners[0].solved ? calculateHandScore(winners[0].solved) : '0';
-
-      gameState.winnerInfo = {
-        winnerName: winnerText,
-        descr: translatedHand,
-        foldedWin: false
-      };
-
       try {
+        const solvedHands = activePlayers.map(p => ({
+          player: p,
+          solved: evaluatePlayerHand(p.cards, gameState.board, gameState.gameMode)
+        }));
+
+        const handsOnly = solvedHands.map(sh => sh.solved);
+        const winningHands = Hand.winners(handsOnly);
+        const winners = solvedHands.filter(sh => winningHands.includes(sh.solved));
+        
+        let winnerText = '';
+        if (winners.length > 1) {
+          const names = winners.map(w => w.player.name).join(' & ');
+          winnerText = `UAVGJOERT / DELING: ${names}`;
+          winners.forEach(w => {
+            w.player.points = (w.player.points || 0) + 1;
+          });
+        } else if (winners.length === 1) {
+          winnerText = winners[0].player.name;
+          winners[0].player.points = (winners[0].player.points || 0) + 2;
+        }
+
+        const topWinner = winners[0] || solvedHands[0];
+        const rawDescr = topWinner && topWinner.solved ? topWinner.solved.descr : 'Ukjent hånd';
+        const translatedHand = translateHandDescription(rawDescr);
+        const handRank = topWinner && topWinner.solved ? (topWinner.solved.rank || 0) : 0;
+        
+        // Beregn poengsum som vanlig tall
+        const handScore = topWinner && topWinner.solved ? calculateHandScore(topWinner.solved) : 0;
+
+        gameState.winnerInfo = {
+          winnerName: winnerText,
+          descr: translatedHand,
+          foldedWin: false
+        };
+
+        // Sett inn i databasen
         await pool.query(
           'INSERT INTO hand_history (player, hand, hand_rank, hand_score, game_mode) VALUES ($1, $2, $3, $4, $5)',
           [winnerText, translatedHand, handRank, handScore, gameState.gameMode]
         );
-      } catch (dbErr) {
-        console.error("Feil ved lagring av vinnerhånd til DB:", dbErr);
+      } catch (err) {
+        console.error("Feil under evaluering av SHOWDOWN / DB-lagring:", err);
       }
     }
+    
     updateAll();
   });
 
@@ -427,12 +435,12 @@ io.on('connection', (socket) => {
     }
 
     try {
-      // Sorterer nå først på hand_rank DESC, deretter den eksakte hand_score DESC, og til slutt id DESC
+      // Sortering basert på hand_score
       const res = await pool.query(`
         SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
         FROM hand_history 
         ${timeQuery}
-        ORDER BY hand_rank DESC, hand_score DESC, id DESC 
+        ORDER BY hand_score DESC, id DESC 
         LIMIT 10
       `);
 
