@@ -45,7 +45,7 @@ function closeAllModals() {
   document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
 }
 
-// Innstillinger for standard pokertype
+// Innstillinger for standard pokertype og dynamisk QR-kode generering
 document.addEventListener('DOMContentLoaded', () => {
   const defaultType = localStorage.getItem('defaultGameType') || 'Omaha';
   const selectElem = document.getElementById('default-game-type');
@@ -53,6 +53,20 @@ document.addEventListener('DOMContentLoaded', () => {
   
   const pregameSelect = document.getElementById('game-type-select');
   if (pregameSelect) pregameSelect.value = defaultType;
+
+  // Generer QR-kode automatisk basert på nåværende domene/adresse
+  const qrContainer = document.getElementById('qrcode');
+  if (qrContainer) {
+    const mobileUrl = `${window.location.origin}/mobile.html`;
+    new QRCode(qrContainer, {
+      text: mobileUrl,
+      width: 140,
+      height: 140,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  }
 });
 
 function saveDefaultGameType(value) {
@@ -84,7 +98,7 @@ function renderConnectedPlayers() {
   const startBtn = document.getElementById('start-game-btn');
 
   if (connectedPlayers.length === 0) {
-    container.innerHTML = `<span class="no-players-msg">Ingen spillere har logget inn ennå... Skann QR-koden på mobilen.</span>`;
+    container.innerHTML = `<span class="no-players-msg">Ingen spillere har logget inn ennå...</span>`;
     startBtn.disabled = true;
     return;
   }
@@ -309,7 +323,7 @@ function switchPhase(phaseId) {
 
 // 1. Topp 10 Hall of Fame
 function renderTop10() {
-  const container = document.getElementById('top10-modal');
+  const container = document.getElementById('top10-content');
   
   // Aggreger poeng per spiller
   const totals = {};
@@ -335,15 +349,12 @@ function renderTop10() {
     .map(player => ({ player, ...totals[player] }))
     .sort((a, b) => b.points - a.points);
 
-  let html = `
-    <h2>📊 Topp 10 Hall of Fame</h2>
-    <p class="subtitle" style="font-size:0.85rem; margin-bottom:15px;">Sammenlagt poengstilling på Løland Gård</p>
-  `;
+  let html = "";
 
   if (sorted.length === 0) {
-    html += `<p style="color:#94a3b8; font-style:italic;">Ingen omganger er registrert ennå.</p>`;
+    html = `<p style="color:#94a3b8; font-style:italic;">Ingen omganger er registrert ennå.</p>`;
   } else {
-    html += `
+    html = `
       <table class="hall-of-fame-table">
         <thead>
           <tr>
@@ -369,7 +380,6 @@ function renderTop10() {
     `;
   }
 
-  html += `<button class="btn btn-secondary" onclick="closeAllModals()" style="margin-top: 20px;">Lukk</button>`;
   container.innerHTML = html;
 }
 

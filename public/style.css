@@ -162,7 +162,7 @@ select, textarea, input[type="text"] {
   font-size: 1rem;
 }
 
-/* Tilkoblede spillere (Fase 1) */
+/* Tilkoblede spillere & QR-kode (Fase 1) */
 .connected-players-box {
   background-color: #0f172a;
   border: 1px dashed #334155;
@@ -175,6 +175,30 @@ select, textarea, input[type="text"] {
   font-size: 0.95rem;
   color: #94a3b8;
   margin-bottom: 12px;
+}
+
+.qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  background-color: #1e293b;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+
+#qrcode {
+  padding: 8px;
+  background-color: white;
+  border-radius: 6px;
+}
+
+.qr-text {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #94a3b8;
 }
 
 .player-chips-container {

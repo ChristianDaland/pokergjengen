@@ -9,6 +9,8 @@
   <script src="/socket.io/socket.io.js"></script>
   <!-- Pokersolver for håndevaluering -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pokersolver/2.1.2/pokersolver.min.js"></script>
+  <!-- Generering av QR-kode -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -78,11 +80,18 @@
             <textarea id="pregame-notes" rows="3" placeholder="Skriv inn eventuelle notater for kvelden..."></textarea>
           </div>
 
-          <!-- Sanntidsvisning av tilkoblede spillere -->
+          <!-- Sanntidsvisning av tilkoblede spillere + QR-kode -->
           <div class="connected-players-box">
-            <h3>Påloggede spillere (via QR-kode på mobil):</h3>
+            <h3>Pålogging for spillere:</h3>
+            
+            <div class="qr-container">
+              <div id="qrcode"></div>
+              <p class="qr-text">Skann QR-koden med mobilen for å koble til</p>
+            </div>
+
+            <h4 style="font-size:0.9rem; margin-bottom:8px; color:#cbd5e1;">Tilkoblede spillere:</h4>
             <div id="connected-players-list" class="player-chips-container">
-              <span class="no-players-msg">Ingen spillere har logget inn ennå... Skann QR-koden på mobilen.</span>
+              <span class="no-players-msg">Ingen spillere har logget inn ennå...</span>
             </div>
           </div>
 
@@ -190,7 +199,7 @@
   <div id="about-modal" class="modal hidden">
     <h2>Om Løland Gård Poker</h2>
     <p>Dette systemet er skreddersydd for pokerkveldene på Løland Gård. Det styrer kveldsadministrasjon, utslåing, poengberegning og historikk, mens sjetonger og betting håndteres fysisk rundt bordet.</p>
-    <p><strong>Faste spillere:</strong> Kai, Ronny, Einar, Joakim og Odd Christian.</p>
+    <p style="margin-top: 10px;"><strong>Faste spillere:</strong> Kai, Ronny, Einar, Joakim og Odd Christian.</p>
     <button class="btn btn-secondary" onclick="closeAllModals()" style="margin-top: 15px;">Lukk</button>
   </div>
 
