@@ -46,9 +46,6 @@
       height: 24px;
       font-weight: bold;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
     .reset-btn {
@@ -78,17 +75,6 @@
       font-size: 1.2rem;
     }
 
-    .winner-banner {
-      background: #ff9800;
-      color: black;
-      font-weight: bold;
-      font-size: 2rem;
-      padding: 12px 30px;
-      border-radius: 10px;
-      text-align: center;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    }
-
     .community-cards-area {
       text-align: center;
     }
@@ -106,78 +92,89 @@
 
     .cards-row {
       display: flex;
-      gap: calc(12px * var(--card-scale));
+      gap: calc(14px * var(--card-scale));
       justify-content: center;
       align-items: center;
-      min-height: calc(140px * var(--card-scale));
+      min-height: calc(150px * var(--card-scale));
     }
 
-    /* Detaljert spillkort-design */
+    /* KORT DESIGN OG ANIMASJON */
     .card {
       background: white;
       border-radius: calc(8px * var(--card-scale));
-      width: calc(95px * var(--card-scale));
-      height: calc(140px * var(--card-scale));
+      width: calc(100px * var(--card-scale));
+      height: calc(145px * var(--card-scale));
       position: relative;
-      padding: calc(5px * var(--card-scale));
+      padding: calc(6px * var(--card-scale));
       font-weight: bold;
       color: black;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.4);
       user-select: none;
+      animation: flipIn 0.4s ease-out forwards;
+    }
+
+    @keyframes flipIn {
+      0% { transform: scale(0.5) rotateY(90deg); opacity: 0; }
+      100% { transform: scale(1) rotateY(0deg); opacity: 1; }
     }
 
     .card.red { color: #d9534f; }
 
-    /* Hjørneindekser */
+    /* Hjørnesymboler */
     .card-corner {
       position: absolute;
       display: flex;
       flex-direction: column;
       align-items: center;
-      line-height: 0.9;
-      font-size: calc(1rem * var(--card-scale));
+      line-height: 0.95;
+      font-size: calc(1.1rem * var(--card-scale));
     }
 
     .card-corner.top-left {
-      top: calc(5px * var(--card-scale));
-      left: calc(5px * var(--card-scale));
+      top: calc(6px * var(--card-scale));
+      left: calc(6px * var(--card-scale));
     }
 
     .card-corner.bottom-right {
-      bottom: calc(5px * var(--card-scale));
-      right: calc(5px * var(--card-scale));
+      bottom: calc(6px * var(--card-scale));
+      right: calc(6px * var(--card-scale));
       transform: rotate(180deg);
     }
 
-    /* Sentrert innhold / Symbolmønster */
-    .card-center {
+    /* Symmetrisk Grid for Midten */
+    .card-center-grid {
       position: absolute;
-      top: calc(20px * var(--card-scale));
-      bottom: calc(20px * var(--card-scale));
-      left: calc(18px * var(--card-scale));
-      right: calc(18px * var(--card-scale));
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-around;
+      top: calc(24px * var(--card-scale));
+      bottom: calc(24px * var(--card-scale));
+      left: calc(22px * var(--card-scale));
+      right: calc(22px * var(--card-scale));
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       align-items: center;
-      align-content: space-around;
+      justify-items: center;
     }
 
-    .pip {
-      font-size: calc(1.2rem * var(--card-scale));
+    .pip-item {
+      font-size: calc(1.3rem * var(--card-scale));
       line-height: 1;
-      width: 30%;
-      text-align: center;
+    }
+
+    .pip-item.inverted {
+      transform: rotate(180deg);
+    }
+
+    .pip-item.center-single {
+      grid-column: 1 / span 2;
     }
 
     /* Bildekort */
-    .face-card {
-      width: 100%;
-      height: 100%;
+    .face-card-container {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: calc(3rem * var(--card-scale));
+      font-size: calc(3.2rem * var(--card-scale));
     }
 
     .players-grid {
@@ -194,18 +191,6 @@
       border-radius: 16px;
       padding: 15px;
       text-align: center;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-
-    .player-name {
-      font-size: 1.4rem;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-
-    .player-points {
-      font-size: 1rem;
-      color: #ffd700;
     }
   </style>
 </head>
@@ -225,8 +210,6 @@
     <div class="info-bar">
       <span>🏠 Vert: <b id="display-host">Odd Christian</b></span>
     </div>
-
-    <div id="winner-banner" class="winner-banner" style="display: none;"></div>
 
     <div class="community-cards-area">
       <h2>FELLESKORT (BOARD)</h2>
@@ -268,26 +251,37 @@
       
       const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
 
-      // Generer midten av kortet
-      let centerHtml = '';
+      let centerContent = '';
       const numPips = parseInt(displayVal, 10);
 
       if (!isNaN(numPips)) {
-        // Tallkort (2-10): Lag det antall symboler som kortet tilsier
-        let pips = '';
-        for (let i = 0; i < numPips; i++) {
-          pips += `<div class="pip">${suit.symbol}</div>`;
+        let pipsMarkup = '';
+        let half = Math.floor(numPips / 2);
+        
+        // Symmetrisk topp-halvdel
+        for (let i = 0; i < half; i++) {
+          pipsMarkup += `<div class="pip-item">${suit.symbol}</div>`;
         }
-        centerHtml = `<div class="card-center">${pips}</div>`;
-      } else {
-        // Bildekort (J, Q, K, A)
-        let icon = suit.symbol;
-        if (displayVal === 'J') icon = '⚔️';
-        if (displayVal === 'Q') icon = '👑';
-        if (displayVal === 'K') icon = '♚';
-        if (displayVal === 'A') icon = suit.symbol;
 
-        centerHtml = `<div class="card-center"><div class="face-card">${icon}</div></div>`;
+        // Oddetalls-symbol i midten dersom tallet er 3, 5, 7, 9
+        if (numPips % 2 !== 0) {
+          pipsMarkup += `<div class="pip-item center-single">${suit.symbol}</div>`;
+        }
+
+        // Symmetrisk bunn-halvdel (opp-ned)
+        for (let i = 0; i < half; i++) {
+          pipsMarkup += `<div class="pip-item inverted">${suit.symbol}</div>`;
+        }
+
+        centerContent = `<div class="card-center-grid">${pipsMarkup}</div>`;
+      } else {
+        let faceIcon = suit.symbol;
+        if (displayVal === 'J') faceIcon = '⚔️';
+        if (displayVal === 'Q') faceIcon = '👑';
+        if (displayVal === 'K') faceIcon = '♚';
+        if (displayVal === 'A') faceIcon = suit.symbol;
+
+        centerContent = `<div class="face-card-container">${faceIcon}</div>`;
       }
 
       return `
@@ -296,7 +290,7 @@
             <div>${displayVal}</div>
             <div>${suit.symbol}</div>
           </div>
-          ${centerHtml}
+          ${centerContent}
           <div class="card-corner bottom-right">
             <div>${displayVal}</div>
             <div>${suit.symbol}</div>
@@ -305,51 +299,22 @@
       `;
     }
 
-    socket.on('connect', () => {
-      socket.emit('request_game_state');
-    });
-
     socket.on('game_state', (state) => {
       if (state.host) {
         document.getElementById('display-host').innerText = state.host;
       }
 
-      // Felleskort
       const boardDiv = document.getElementById('community-cards');
       boardDiv.innerHTML = (state.communityCards || []).map(c => formatCard(c)).join('');
 
-      // Vinner
-      const banner = document.getElementById('winner-banner');
-      if (state.winner) {
-        banner.innerText = `🏆 WINNER: ${state.winner.name} (${state.winner.handName})`;
-        banner.style.display = 'block';
-      } else {
-        banner.style.display = 'none';
-      }
-
-      // Spillere
       const playersDiv = document.getElementById('players-container');
       if (!state.players || state.players.length === 0) {
         playersDiv.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #aaa; font-size: 1.2rem;">Venter på at spillere skal koble seg til...</div>';
       } else {
         playersDiv.innerHTML = state.players.map(p => `
           <div class="player-box">
-            <div class="player-name">${p.name}</div>
-            <div class="player-points">Poeng: ${p.points || 0}</div>
-          </div>
-        `).join('');
-      }
-    });
-
-    socket.on('players_updated', (players) => {
-      const playersDiv = document.getElementById('players-container');
-      if (!players || players.length === 0) {
-        playersDiv.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #aaa; font-size: 1.2rem;">Venter på at spillere skal koble seg til...</div>';
-      } else {
-        playersDiv.innerHTML = players.map(p => `
-          <div class="player-box">
-            <div class="player-name">${p.name}</div>
-            <div class="player-points">Poeng: ${p.points || 0}</div>
+            <div class="player-name" style="font-size: 1.4rem; font-weight: bold;">${p.name}</div>
+            <div style="color: #ffd700; margin-top: 5px;">Poeng: ${p.points || 0}</div>
           </div>
         `).join('');
       }
