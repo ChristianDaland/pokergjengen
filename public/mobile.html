@@ -17,90 +17,7 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      position: relative;
     }
-
-    /* Topbar med Hamburgermeny */
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 5px 10px;
-      background: #1e1e1e;
-      border-radius: 8px;
-      margin-bottom: 15px;
-    }
-
-    .hamburger-btn {
-      background: none;
-      border: none;
-      color: white;
-      font-size: 1.8rem;
-      cursor: pointer;
-      padding: 0 5px;
-    }
-
-    /* Sidelagt Meny (Drawer) */
-    .menu-drawer {
-      position: fixed;
-      top: 0;
-      right: -280px;
-      width: 280px;
-      height: 100%;
-      background-color: #1e1e1e;
-      box-shadow: -2px 0 10px rgba(0,0,0,0.7);
-      transition: right 0.3s ease;
-      z-index: 1000;
-      padding: 20px;
-      text-align: left;
-    }
-
-    .menu-drawer.open {
-      right: 0;
-    }
-
-    .menu-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #333;
-      padding-bottom: 10px;
-      margin-bottom: 20px;
-    }
-
-    .close-btn {
-      background: none;
-      border: none;
-      color: #aaa;
-      font-size: 1.5rem;
-      cursor: pointer;
-    }
-
-    .menu-item {
-      display: block;
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 10px;
-      background: #2a2a2a;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      text-align: left;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-
-    .overlay-backdrop {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
-      z-index: 999;
-    }
-    .overlay-backdrop.show { display: block; }
 
     .card-selection {
       background: #1e1e1e;
@@ -132,18 +49,18 @@
     }
 
     .btn-join { background-color: #2196f3; color: white; }
-    .btn-fold { background-color: #f44336; color: white; margin-top: 15px; }
+    .btn-fold { background-color: #f44336; color: white; margin-top: 25px; }
 
     .cards-wrapper {
-      margin: 15px 0;
+      margin: 20px 0;
       cursor: pointer;
       user-select: none;
     }
 
     .cards-hint {
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       color: #aaa;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
 
     .cards-container {
@@ -152,7 +69,7 @@
       gap: 10px;
     }
 
-    /* Kortdesign */
+    /* Forenklet og forstørret kortdesign for mobil */
     .card {
       display: inline-flex;
       flex-direction: column;
@@ -180,7 +97,7 @@
       color: #ffffff;
     }
     .card-back-pattern {
-      font-size: 1.5rem;
+      font-size: 1.6rem;
       opacity: 0.4;
     }
 
@@ -199,48 +116,15 @@
       color: #f44336;
       font-weight: bold;
       font-size: 1.2rem;
-      margin-top: 10px;
-    }
-
-    /* Modal for statistikk */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #1e1e1e;
-      padding: 20px;
-      border-radius: 12px;
-      width: 90%;
-      max-width: 400px;
-      z-index: 1001;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Bar med Menyknapp -->
-  <div class="top-bar">
-    <span style="font-weight: bold;">Løland Gård Poker</span>
-    <button class="hamburger-btn" onclick="toggleMenu()">☰</button>
-  </div>
-
-  <!-- Sidelagt Meny (Drawer) -->
-  <div id="backdrop" class="overlay-backdrop" onclick="toggleMenu()"></div>
-  <div id="menu-drawer" class="menu-drawer">
-    <div class="menu-header">
-      <h3 style="margin:0;">Meny</h3>
-      <button class="close-btn" onclick="toggleMenu()">✕</button>
-    </div>
-    <button class="menu-item" onclick="showStats()">📊 Vis Statistikk</button>
-    <button class="menu-item" onclick="location.reload()">🔄 Bytt Navn / Logg ut</button>
-  </div>
-
   <!-- Innloggingsskjerm -->
   <div id="login-screen" class="card-selection">
-    <h2>Velkommen til Pokerbordet</h2>
+    <h2 style="margin-top: 5px;">Løland Gård Poker</h2>
     <p style="font-size: 0.9rem; color: #aaa;">Velg ditt navn eller skriv inn nytt:</p>
     
     <select id="player-select" onchange="toggleCustomNameInput()">
@@ -255,9 +139,9 @@
 
   <!-- Spillskjerm -->
   <div id="game-screen" style="display: none; flex: 1;">
-    <h3 id="player-title" style="margin-bottom: 5px;"></h3>
+    <h2 id="player-title" style="margin-bottom: 5px;"></h2>
     <div id="player-role"></div>
-    <div id="player-points" style="font-size: 0.9rem; color: #ffd700; margin-bottom: 10px;"></div>
+    <div id="player-points" style="font-size: 1rem; color: #ffd700; margin-bottom: 10px;"></div>
 
     <!-- Kortområde med trykk-for-å-se logikk -->
     <div class="cards-wrapper" onclick="toggleShowCards()">
@@ -272,13 +156,6 @@
     <div id="folded-msg" class="folded-overlay" style="display: none;">
       Du har kastet deg denne runden.
     </div>
-  </div>
-
-  <!-- Statistikk Modal -->
-  <div id="stats-modal" class="modal">
-    <h3>Statistikk</h3>
-    <div id="stats-content" style="text-align: left; margin: 15px 0;">Laster statistikk...</div>
-    <button class="btn btn-join" onclick="closeStats()">Lukk</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -303,13 +180,6 @@
       customOpt.innerText = '+ Skriv annet navn...';
       select.appendChild(customOpt);
     });
-
-    function toggleMenu() {
-      const drawer = document.getElementById('menu-drawer');
-      const backdrop = document.getElementById('backdrop');
-      drawer.classList.toggle('open');
-      backdrop.classList.toggle('show');
-    }
 
     function toggleCustomNameInput() {
       const select = document.getElementById('player-select');
@@ -446,28 +316,6 @@
         foldBtn.style.display = data.phase !== 'VENTING' && data.phase !== 'SHOWDOWN' ? 'block' : 'none';
         foldedMsg.style.display = 'none';
       }
-    });
-
-    function showStats() {
-      toggleMenu();
-      document.getElementById('stats-modal').style.display = 'block';
-      document.getElementById('backdrop').classList.add('show');
-      
-      socket.emit('get_stats');
-    }
-
-    function closeStats() {
-      document.getElementById('stats-modal').style.display = 'none';
-      document.getElementById('backdrop').classList.remove('show');
-    }
-
-    socket.on('stats_data', (stats) => {
-      const content = document.getElementById('stats-content');
-      if (!stats || stats.length === 0) {
-        content.innerText = 'Ingen statistikk registrert ennå.';
-        return;
-      }
-      content.innerHTML = stats.map(s => `<p><b>${s.name}:</b> ${s.wins || 0} seiere</p>`).join('');
     });
   </script>
 </body>

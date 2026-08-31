@@ -45,14 +45,15 @@
     .menu-drawer {
       position: fixed;
       top: 0;
-      right: -320px;
-      width: 320px;
+      right: -340px;
+      width: 340px;
       height: 100%;
       background-color: #081c15;
       box-shadow: -2px 0 10px rgba(0,0,0,0.7);
       transition: right 0.3s ease;
       z-index: 1000;
       padding: 20px;
+      overflow-y: auto;
     }
 
     .menu-drawer.open { right: 0; }
@@ -74,6 +75,19 @@
       cursor: pointer;
     }
 
+    .menu-section {
+      margin-bottom: 20px;
+    }
+
+    .menu-section label {
+      display: block;
+      font-size: 0.85rem;
+      color: #74c69d;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
     .menu-item {
       display: block;
       width: 100%;
@@ -89,6 +103,17 @@
     }
 
     .menu-item:hover { background: #2d6a4f; }
+
+    select.menu-input, input.menu-input {
+      width: 100%;
+      padding: 10px;
+      background: #1b4332;
+      color: white;
+      border: 1px solid #2d6a4f;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-size: 1rem;
+    }
 
     .overlay-backdrop {
       display: none;
@@ -135,6 +160,16 @@
       padding: 15px;
       border-radius: 12px;
       text-align: center;
+    }
+
+    .info-bar {
+      display: flex;
+      gap: 15px;
+      background: rgba(0,0,0,0.4);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      margin-bottom: 10px;
     }
 
     .winner-banner {
@@ -232,12 +267,39 @@
   <div id="backdrop" class="overlay-backdrop" onclick="toggleMenu()"></div>
   <div id="menu-drawer" class="menu-drawer">
     <div class="menu-header">
-      <h2 style="margin:0;">Meny</h2>
+      <h2 style="margin:0;">Meny & Innstillinger</h2>
       <button class="close-btn" onclick="toggleMenu()">✕</button>
     </div>
-    <button class="menu-item" onclick="showStats()">📊 Vis Statistikk</button>
-    <button class="menu-item" onclick="toggleGameMode()">🔄 Bytt Spilltype (Omaha/Texas)</button>
-    <button class="menu-item" onclick="resetGame()">⚠️ Nullstill Spill</button>
+
+    <!-- Statistikk -->
+    <div class="menu-section">
+      <button class="menu-item" onclick="showStats()">📊 Vis Statistikk / Leaderboard</button>
+    </div>
+
+    <!-- Spillmodus -->
+    <div class="menu-section">
+      <button class="menu-item" onclick="toggleGameMode()">🔄 Bytt Spilltype (Omaha / Texas)</button>
+    </div>
+
+    <!-- Vert & Sted -->
+    <div class="menu-section">
+      <label>Vert (Huset):</label>
+      <select id="host-select" class="menu-input" onchange="updateHostAndLocation()">
+        <option value="Odd Christian">Odd Christian</option>
+        <option value="Einar">Einar</option>
+        <option value="Kai">Kai</option>
+        <option value="Ronny">Ronny</option>
+        <option value="Joakim">Joakim</option>
+      </select>
+
+      <label>Spillested:</label>
+      <input type="text" id="location-input" class="menu-input" value="Fjøset, Hos Kai / Gården" onchange="updateHostAndLocation()">
+    </div>
+
+    <!-- Nullstilling -->
+    <div class="menu-section" style="margin-top: 30px;">
+      <button class="menu-item" style="background: #a71d2a;" onclick="resetGame()">⚠️ Nullstill Spill / Start På Nytt</button>
+    </div>
   </div>
 
   <!-- Hovedinnhold -->
@@ -245,6 +307,12 @@
     
     <!-- Pokerbord -->
     <div class="table-area">
+      <!-- Vert og Sted Info -->
+      <div class="info-bar">
+        <span>🏠 Vert: <b id="display-host">Odd Christian</b></span>
+        <span>📍 Sted: <b id="display-location">Fjøset, Hos Kai / Gården</b></span>
+      </div>
+
       <div id="winner-banner" class="winner-banner" style="display: none;"></div>
 
       <div>
@@ -280,7 +348,7 @@
 
   <!-- Statistikk Modal -->
   <div id="stats-modal" class="modal">
-    <h3>Statistikk</h3>
+    <h3>Statistikk & Leaderboard</h3>
     <div id="stats-content" style="text-align: left; margin: 15px 0;">Laster...</div>
     <button class="btn btn-action" onclick="closeStats()">Lukk</button>
   </div>
@@ -300,6 +368,16 @@
     function toggleMenu() {
       document.getElementById('menu-drawer').classList.toggle('open');
       document.getElementById('backdrop').classList.toggle('show');
+    }
+
+    function updateHostAndLocation() {
+      const host = document.getElementById('host-select').value;
+      const location = document.getElementById('location-input').value;
+      
+      document.getElementById('display-host').innerText = host;
+      document.getElementById('display-location').innerText = location;
+
+      socket.emit('update_info', { host, location });
     }
 
     function formatCard(cardCode) {
@@ -328,6 +406,10 @@
     socket.on('game_state', (state) => {
       // Oppdater status
       document.getElementById('game-status-title').innerText = `Modus: ${state.mode} | Fase: ${state.phase}`;
+
+      // Vert og sted
+      if (state.host) document.getElementById('display-host').innerText = state.host;
+      if (state.location) document.getElementById('display-location').innerText = state.location;
 
       // Felleskort
       const boardDiv = document.getElementById('community-cards');
@@ -386,7 +468,7 @@
     socket.on('stats_data', (stats) => {
       const content = document.getElementById('stats-content');
       if (!stats || stats.length === 0) {
-        content.innerText = 'Ingen statistikk enda.';
+        content.innerText = 'Ingen statistikk registrert ennå.';
         return;
       }
       content.innerHTML = stats.map(s => `<p><b>${s.name}:</b> ${s.wins || 0} seiere</p>`).join('');
