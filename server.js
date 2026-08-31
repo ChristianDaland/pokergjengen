@@ -22,9 +22,14 @@ async function initDB() {
         id SERIAL PRIMARY KEY,
         player VARCHAR(100),
         hand VARCHAR(100),
+        hand_rank INT DEFAULT 0,
         game_mode VARCHAR(20),
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+    `);
+    // Utvider tabellen med kolonnen hand_rank hvis tabellen fantes fra før
+    await pool.query(`
+      ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS hand_rank INT DEFAULT 0;
     `);
     console.log("Database-tabell 'hand_history' er klar!");
   } catch (err) {
@@ -297,6 +302,8 @@ io.on('connection', (socket) => {
 
       const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
       const translatedHand = translateHandDescription(rawDescr);
+      // Hent rangering (tall) fra pokersolver
+      const handRank = winners[0] && winners[0].solved ? (winners[0].solved.rank || 0) : 0;
 
       gameState.winnerInfo = {
         winnerName: winnerText,
@@ -304,11 +311,11 @@ io.on('connection', (socket) => {
         foldedWin: false
       };
 
-      // --- LAGRE VINNERHÅND TIL DATABASE ---
+      // --- LAGRE VINNERHÅND OG RANGERINGSVERDI TIL DATABASE ---
       try {
         await pool.query(
-          'INSERT INTO hand_history (player, hand, game_mode) VALUES ($1, $2, $3)',
-          [winnerText, translatedHand, gameState.gameMode]
+          'INSERT INTO hand_history (player, hand, hand_rank, game_mode) VALUES ($1, $2, $3, $4)',
+          [winnerText, translatedHand, handRank, gameState.gameMode]
         );
       } catch (dbErr) {
         console.error("Feil ved lagring av vinnerhånd til DB:", dbErr);
@@ -335,7 +342,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Henter Topp 10 vinnerhender direkte fra PostgreSQL databasen
+  // Henter Topp 10 vinnerhender sortert etter BEST HÅND (hand_rank DESC)
   socket.on('get_top10', async (data) => {
     const period = data ? data.period : 'tonight';
     let timeQuery = '';
@@ -353,7 +360,7 @@ io.on('connection', (socket) => {
         SELECT player AS "playerName", hand AS "handDescr", TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI') AS date 
         FROM hand_history 
         ${timeQuery}
-        ORDER BY id DESC 
+        ORDER BY hand_rank DESC, id DESC 
         LIMIT 10
       `);
       socket.emit('top10_data', res.rows);
