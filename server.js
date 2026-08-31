@@ -24,15 +24,17 @@ async function initDB() {
         player VARCHAR(100),
         hand VARCHAR(100),
         hand_rank INT DEFAULT 0,
-        hand_score BIGINT DEFAULT 0,
+        primary_value INT DEFAULT 0,
+        secondary_value INT DEFAULT 0,
         game_mode VARCHAR(20),
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    
+
+    // Sikrer at de nye kolonnene finnes dersom tabellen allerede var opprettet
     await pool.query(`
-      ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS hand_rank INT DEFAULT 0;
-      ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS hand_score BIGINT DEFAULT 0;
+      ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS primary_value INT DEFAULT 0;
+      ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS secondary_value INT DEFAULT 0;
     `);
 
     await pool.query(`
@@ -97,7 +99,7 @@ function translateHandDescription(descr) {
   return text;
 }
 
-// Konverterer kortverdi-bokstaver fra pokersolver til rene tall
+// Konverterer kortverdi fra pokersolver til tall (2-14)
 function cardValueToNumber(val) {
   if (typeof val === 'number') return val;
   if (!val) return 0;
@@ -110,25 +112,24 @@ function cardValueToNumber(val) {
   return parseInt(str, 10) || 0;
 }
 
-// Beregner en presis og matematisk korrekt poengsum for rangering
-function calculateHandScore(solvedHand) {
-  if (!solvedHand) return 0;
+// Henter primær- og sekundærverdi for presis sammenligning i databasen
+function getHandCardValues(solvedHand) {
+  let prim = 0;
+  let sec = 0;
 
-  // Hovedkategori (0-9): High Card (1), Pair (2)... Straight Flush (9)
-  let rank = Number(solvedHand.rank) || 0;
-  let score = rank * 10000000000;
-
-  // Henter ut verdiene fra pokersolver i riktig rangert rekkefølge
-  if (solvedHand.values && Array.isArray(solvedHand.values)) {
-    let multiplier = 100000000;
-    for (let val of solvedHand.values) {
-      const numericVal = cardValueToNumber(val);
-      score += numericVal * multiplier;
-      multiplier = Math.floor(multiplier / 15);
-    }
+  if (solvedHand && solvedHand.cards && Array.isArray(solvedHand.cards)) {
+    const cardNums = solvedHand.cards.map(c => cardValueToNumber(c.value));
+    if (cardNums.length > 0) prim = cardNums[0];
+    if (cardNums.length > 1) sec = cardNums[1];
   }
 
-  return Math.floor(score);
+  // Ekstra sjekk dersom pokersolver har sine verdier i values-matrisen
+  if (solvedHand && solvedHand.values && Array.isArray(solvedHand.values)) {
+    if (solvedHand.values.length > 0) prim = cardValueToNumber(solvedHand.values[0]);
+    if (solvedHand.values.length > 1) sec = cardValueToNumber(solvedHand.values[1]);
+  }
+
+  return { primary: prim, secondary: sec };
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
@@ -406,10 +407,9 @@ io.on('connection', (socket) => {
         const topWinner = winners[0] || solvedHands[0];
         const rawDescr = topWinner && topWinner.solved ? topWinner.solved.descr : 'Ukjent hånd';
         const translatedHand = translateHandDescription(rawDescr);
-        const handRank = (topWinner && topWinner.solved && topWinner.solved.rank) ? Number(topWinner.solved.rank) : 0;
         
-        // Beregn korrekt numerisk poengsum
-        const handScore = topWinner && topWinner.solved ? calculateHandScore(topWinner.solved) : 0;
+        const handRank = (topWinner && topWinner.solved && topWinner.solved.rank) ? Number(topWinner.solved.rank) : 0;
+        const { primary, secondary } = topWinner && topWinner.solved ? getHandCardValues(topWinner.solved) : { primary: 0, secondary: 0 };
 
         gameState.winnerInfo = {
           winnerName: winnerText,
@@ -418,8 +418,8 @@ io.on('connection', (socket) => {
         };
 
         await pool.query(
-          'INSERT INTO hand_history (player, hand, hand_rank, hand_score, game_mode) VALUES ($1, $2, $3, $4, $5)',
-          [winnerText, translatedHand, handRank, handScore, gameState.gameMode || 'TEXAS']
+          'INSERT INTO hand_history (player, hand, hand_rank, primary_value, secondary_value, game_mode) VALUES ($1, $2, $3, $4, $5, $6)',
+          [winnerText, translatedHand, handRank, primary, secondary, gameState.gameMode || 'TEXAS']
         );
       } catch (err) {
         console.error("Feil ved SHOWDOWN:", err);
@@ -466,7 +466,7 @@ io.on('connection', (socket) => {
         SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
         FROM hand_history 
         ${timeQuery}
-        ORDER BY hand_score DESC, id DESC 
+        ORDER BY hand_rank DESC, primary_value DESC, secondary_value DESC, id DESC 
         LIMIT 10
       `);
 
