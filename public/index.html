@@ -4,371 +4,224 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Løland Gård Poker</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #1b4d2e;
-      color: white;
-      text-align: center;
-      margin: 0;
-      padding: 10px 15px 90px 15px;
-    }
-
-    h1 {
-      margin: 5px 0 10px 0;
-      font-size: 1.8rem;
-    }
-
-    .winner-banner {
-      background: linear-gradient(45deg, #ff9800, #f44336);
-      color: white;
-      padding: 12px 18px;
-      font-size: 1.4rem;
-      font-weight: bold;
-      border-radius: 12px;
-      margin: 0 auto 12px auto;
-      max-width: 900px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-      animation: pulse 1.5s infinite alternate;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(0.98); }
-      100% { transform: scale(1.01); }
-    }
-
-    .main-layout {
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      gap: 15px;
-      max-width: 1150px;
-      margin: 0 auto;
-    }
-
-    .poker-table {
-      flex: 1;
-      border: 8px solid #5c3a21;
-      background-color: #2e7d32;
-      border-radius: 60px;
-      padding: 15px;
-      min-height: 380px;
-      box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
-    }
-
-    .sidebar-right {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      width: 160px;
-    }
-
-    .qr-box {
-      background-color: rgba(0, 0, 0, 0.6);
-      border: 2px solid #ffffff;
-      border-radius: 16px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-    }
-
-    .cards-container {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      min-height: 95px;
-      margin: 10px 0;
-    }
-
-    .card {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #ffffff;
-      border-radius: 8px;
-      width: 60px;
-      height: 85px;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.5);
-      font-weight: bold;
-    }
-    .card.red { color: #d9534f; }
-    .card.black { color: #222222; }
-    .card-val { font-size: 1.4rem; line-height: 1; }
-    .card-suit { font-size: 1.6rem; line-height: 1; }
-
-    .players-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 12px;
-      margin-top: 10px;
-    }
-
-    .player-card {
-      background: rgba(0,0,0,0.7);
-      border: 2px solid #fff;
-      border-radius: 12px;
-      padding: 10px 14px;
-      min-width: 140px;
-    }
-
-    .badge {
-      display: inline-block;
-      background: #ff5722;
-      color: white;
-      font-size: 0.8rem;
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-top: 4px;
-      font-weight: bold;
-    }
-
-    .controls {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background-color: rgba(15, 35, 20, 0.95);
-      padding: 12px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.5);
-      z-index: 100;
-    }
-
-    .controls-left {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .version-tag {
-      font-size: 0.85rem;
-      color: #888888;
-      font-weight: bold;
-      user-select: none;
-    }
-
-    button {
-      padding: 10px 16px;
-      font-size: 0.95rem;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: all 0.2s ease;
-    }
-
-    button:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-      filter: grayscale(100%);
-    }
-
-    .btn-mode { background-color: #ffffff; color: #333; }
-    .btn-change-mode { background-color: #607d8b; color: white; }
-    .btn-action { background-color: #4caf50; color: white; }
-    .btn-help { background-color: #009688; color: white; }
-
-    /* Knappen for å åpne eget bordvindu */
-    .btn-open-board {
-      background-color: #ff9800;
-      color: white;
-      font-size: 0.85rem;
-      padding: 10px 8px;
-      width: 100%;
-      border-radius: 10px;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
-    }
-    .btn-open-board:hover {
-      background-color: #f57c00;
-    }
-
-    /* Stor, høy handlingsknapp for dealer */
-    .btn-next-large {
-      background: linear-gradient(135deg, #1e88e5, #1565c0);
-      color: white;
-      font-size: 1.2rem;
-      height: 140px;
-      width: 100%;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-    }
-    .btn-next-large:hover:not(:disabled) {
-      transform: scale(1.02);
-      background: linear-gradient(135deg, #2196f3, #1e88e5);
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
+  <!-- Socket.io klient -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Pokersolver for håndevaluering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pokersolver/2.1.2/pokersolver.min.js"></script>
 </head>
 <body>
 
-  <h1>Løland Gård Poker</h1>
+  <!-- Topbar med Tittel og Hamburgermeny -->
+  <header class="topbar">
+    <div class="logo">Løland Gård Poker</div>
+    <button id="menu-toggle-btn" class="hamburger-btn" aria-label="Åpne meny">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </header>
 
-  <div id="winner-banner" class="winner-banner" style="display: none;"></div>
-
-  <div class="main-layout">
-    <div class="poker-table">
-      <h2 id="game-info" style="margin-top: 0; font-size: 1.3rem;">Spillere kan logge inn nå</h2>
-      
-      <div id="board-cards" class="cards-container"></div>
-      <div id="players-list" class="players-container"></div>
+  <!-- Skjult Sidemeny (Hamburgermeny) -->
+  <aside id="side-menu" class="side-menu hidden">
+    <div class="menu-header">
+      <h2>Meny</h2>
+      <button id="close-menu-btn" class="close-btn">&times;</button>
     </div>
+    <nav class="menu-links">
+      <button class="menu-item" onclick="openModal('top10-modal')">📊 Topp 10 Hall of Fame</button>
+      <button class="menu-item" onclick="openModal('notes-modal')">📝 Kveldsnotater / Dagbok</button>
+      <button class="menu-item" onclick="exportToCSV()">📥 Eksporter Data til Excel (CSV)</button>
+      <button class="menu-item" onclick="openModal('archive-modal')">📜 Historisk Arkiv</button>
+      <button class="menu-item" onclick="openModal('about-modal')">ℹ️ Om Spillet</button>
+      <button class="menu-item" onclick="openModal('guide-modal')">📖 Brukerveiledning</button>
+      <button class="menu-item" onclick="openModal('settings-modal')">⚙️ Innstillinger</button>
+    </nav>
+  </aside>
 
-    <div class="sidebar-right">
-      <!-- 1. QR Kode -->
-      <div class="qr-box">
-        <p style="margin: 0 0 8px 0; font-size: 0.85rem; font-weight: bold;">Skann for å bli med:</p>
-        <div id="qrcode"></div>
-      </div>
+  <!-- Hovedbeholder for de ulike fasene -->
+  <main id="app-container">
 
-      <!-- 2. Knapp for å åpne nytt bordvindu -->
-      <button class="btn-open-board" onclick="openBoardWindow()">🖥️ Åpne Bordvisning</button>
+    <!-- FASE 1: PRE-GAME (SETUP) -->
+    <section id="phase-pregame" class="phase-section active-phase">
+      <div class="setup-card">
+        <h1>Velkommen til Løland Gård Poker</h1>
+        <p class="subtitle">Klargjør kvelden før første omgang startes</p>
 
-      <!-- 3. Stor, høy knapp for neste fase/kort -->
-      <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
-    </div>
-  </div>
-
-  <div class="controls">
-    <div class="controls-left">
-      <div id="mode-selection" style="display: flex; gap: 10px;">
-        <button class="btn-mode" onclick="setMode('TEXAS')">Texas Hold'em</button>
-        <button class="btn-mode" onclick="setMode('OMAHA')">Omaha</button>
-      </div>
-
-      <div id="game-controls" style="display: none; gap: 10px;">
-        <button id="btn-change-mode" class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
-        <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
-      </div>
-
-      <!-- Knapp for spilleveiledning -->
-      <button class="btn-help" onclick="openHelpWindow()">📖 Spilleveiledning</button>
-    </div>
-
-    <!-- Versjonstekst nederst til høyre -->
-    <div class="version-tag">Versjon 2.10</div>
-  </div>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-
-    const mobileUrl = window.location.origin + '/mobile.html';
-    new QRCode(document.getElementById("qrcode"), {
-      text: mobileUrl,
-      width: 95,
-      height: 95
-    });
-
-    function formatCard(cardCode) {
-      if (!cardCode) return '';
-      let value = cardCode.slice(0, -1).toUpperCase();
-      if (value === 'T') value = '10';
-      const suitChar = cardCode.slice(-1).toLowerCase();
-      
-      const suits = {
-        'h': { symbol: '♥', color: 'red' },
-        'd': { symbol: '♦', color: 'red' },
-        'c': { symbol: '♣', color: 'black' },
-        's': { symbol: '♠', color: 'black' }
-      };
-      
-      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
-      return `<div class="card ${suit.color}"><span class="card-val">${value}</span><span class="card-suit">${suit.symbol}</span></div>`;
-    }
-
-    function setMode(mode) { socket.emit('set_game_mode', mode); }
-    function resetMode() { socket.emit('set_game_mode', null); }
-    function startNewHand() { socket.emit('start_new_hand'); }
-    function nextPhase() { socket.emit('next_phase'); }
-
-    function openBoardWindow() {
-      window.open('/board.html', 'PokerBoard', 'width=1200,height=800');
-    }
-
-    function openHelpWindow() {
-      window.open('/veiledning.html', 'PokerVeiledning', 'width=750,height=800');
-    }
-
-    socket.on('state_update', (state) => {
-      const modeSelection = document.getElementById('mode-selection');
-      const gameControls = document.getElementById('game-controls');
-      const gameInfo = document.getElementById('game-info');
-      const changeModeBtn = document.getElementById('btn-change-mode');
-      const startHandBtn = document.getElementById('btn-start-hand');
-      const nextBtn = document.getElementById('btn-next-phase');
-
-      if (!state.gameMode) {
-        modeSelection.style.display = 'flex';
-        gameControls.style.display = 'none';
-        nextBtn.style.display = 'none';
-        gameInfo.innerText = 'Velg spilletype for å begynne';
-      } else {
-        modeSelection.style.display = 'none';
-        gameControls.style.display = 'flex';
-        nextBtn.style.display = 'flex';
-        gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
-      }
-
-      const isRoundActive = state.phase !== 'VENTING' && state.phase !== 'SHOWDOWN';
-      changeModeBtn.disabled = isRoundActive;
-      startHandBtn.disabled = isRoundActive;
-
-      if (state.phase === 'PREFLOP') {
-        nextBtn.innerText = 'Åpne Flopp';
-      } else if (state.phase === 'FLOP') {
-        nextBtn.innerText = 'Åpne Turn';
-      } else if (state.phase === 'TURN') {
-        nextBtn.innerText = 'Åpne River';
-      } else if (state.phase === 'RIVER') {
-        nextBtn.innerText = 'Vis Vinner (Showdown)';
-      } else if (state.phase === 'SHOWDOWN') {
-        nextBtn.innerText = 'Ny Runde';
-      } else {
-        nextBtn.innerText = 'Neste Fase';
-      }
-
-      const banner = document.getElementById('winner-banner');
-      if (state.winnerInfo) {
-        banner.innerHTML = `🏆 VINNER: ${state.winnerInfo.winnerName} (${state.winnerInfo.descr})`;
-        banner.style.display = 'block';
-      } else {
-        banner.style.display = 'none';
-      }
-
-      const boardContainer = document.getElementById('board-cards');
-      boardContainer.innerHTML = state.board.map(c => formatCard(c)).join('');
-
-      const playersContainer = document.getElementById('players-list');
-      playersContainer.innerHTML = state.players.map(p => `
-        <div class="player-card">
-          <div><strong>${p.name}</strong></div>
-          <div style="font-size: 0.8rem; color: #ccc;">Plass ${p.seat}</div>
-          ${p.role ? `<span class="badge">${p.role}</span>` : ''}
-          <div style="font-size: 0.8rem; margin-top: 4px;">
-            ${p.folded ? '🔴 FOLDET' : '🟢 INNE'}
+        <form id="pregame-form" onsubmit="event.preventDefault(); startSpillekveld();">
+          
+          <!-- Vertsvalg -->
+          <div class="form-group">
+            <label for="host-select">Kveldens Vert (Host):</label>
+            <select id="host-select" required>
+              <option value="" disabled selected>-- Velg hvem som arrangerer --</option>
+              <option value="Kai">Kai</option>
+              <option value="Ronny">Ronny</option>
+              <option value="Einar">Einar</option>
+              <option value="Joakim">Joakim</option>
+              <option value="Odd Christian">Odd Christian</option>
+            </select>
           </div>
-          ${p.cards && p.cards.length > 0 ? `
-            <div style="margin-top: 6px; display: flex; gap: 4px; justify-content: center;">
-              ${p.cards.map(c => formatCard(c)).join('')}
+
+          <!-- Pokertype -->
+          <div class="form-group">
+            <label for="game-type-select">Spillemodus for 1. omgang:</label>
+            <select id="game-type-select">
+              <option value="Omaha">Omaha</option>
+              <option value="Texas Hold'em">Texas Hold'em</option>
+            </select>
+          </div>
+
+          <!-- Kveldsnotater -->
+          <div class="form-group">
+            <label for="pregame-notes">Kveldsnotater / Dagbok:</label>
+            <textarea id="pregame-notes" rows="3" placeholder="Skriv inn eventuelle notater for kvelden..."></textarea>
+          </div>
+
+          <!-- Sanntidsvisning av tilkoblede spillere -->
+          <div class="connected-players-box">
+            <h3>Påloggede spillere (via QR-kode på mobil):</h3>
+            <div id="connected-players-list" class="player-chips-container">
+              <span class="no-players-msg">Ingen spillere har logget inn ennå... Skann QR-koden på mobilen.</span>
             </div>
-          ` : ''}
+          </div>
+
+          <!-- Startknapp -->
+          <button type="submit" id="start-game-btn" class="btn btn-primary btn-large" disabled>
+            Start Spillekveld
+          </button>
+
+        </form>
+      </div>
+    </section>
+
+    <!-- FASE 2: ACTIVE GAME -->
+    <section id="phase-activegame" class="phase-section hidden">
+      <div class="game-header-card">
+        <div class="round-info">
+          <h2>Omgang <span id="current-round-num">1</span></h2>
+          
+          <!-- Enkelt-trykks Pokertype Veksler -->
+          <div class="gametype-toggle-container">
+            <span class="toggle-label">Modus for denne omgangen:</span>
+            <div class="toggle-buttons">
+              <button type="button" id="btn-mode-omaha" class="mode-btn active" onclick="setRoundGameType('Omaha')">Omaha</button>
+              <button type="button" id="btn-mode-texas" class="mode-btn" onclick="setRoundGameType('Texas Hold\'em')">Texas Hold'em</button>
+            </div>
+          </div>
         </div>
-      `).join('');
-    });
-  </script>
+      </div>
+
+      <!-- Spillbord med aktive spillere og utslåingsbrytere -->
+      <div class="active-players-grid" id="active-players-grid">
+        <!-- Genereres dynamisk via JavaScript -->
+      </div>
+
+      <!-- Showdown & Felleskort Registrering -->
+      <div class="showdown-card">
+        <h3>♠️ Showdown & Felleskort (Board) ♥️</h3>
+        <p class="subtitle" style="margin-bottom: 12px; font-size:0.85rem;">
+          Skriv inn felleskortene fra bordet (f.eks: Ah Kd 10s 7c 2d) eller skann dem via mobilen.
+        </p>
+        <div class="form-group">
+          <label for="board-cards-input">Felleskort (5 kort):</label>
+          <input type="text" id="board-cards-input" placeholder="f.eks. As Ks Qs Js 10s" onchange="updateBoardCards(this.value)">
+        </div>
+      </div>
+
+      <!-- Avslutt omgang knapp -->
+      <div class="round-actions">
+        <button class="btn btn-primary btn-large" onclick="finishRound()">
+          Registrer & Avslutt Omgang ➔
+        </button>
+      </div>
+    </section>
+
+    <!-- FASE 3: POST-ROUND / RESULTAT -->
+    <section id="phase-postround" class="phase-section hidden">
+      <div class="setup-card">
+        <h2>Resultat Omgang <span id="post-round-num">1</span></h2>
+        <p class="subtitle" id="post-round-gametype">Modus: Omaha</p>
+
+        <!-- Visning av felleskort hvis Showdown -->
+        <div id="post-round-board" class="board-display-container"></div>
+
+        <div id="round-results-list" style="margin-bottom: 25px;">
+          <!-- Omgangsresultat, vinnerhånd og poengtildeling tegnes ut her -->
+        </div>
+
+        <button class="btn btn-primary btn-large" onclick="nextRound()">
+          Start Neste Omgang ➔
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modaler for Hamburgermenyen -->
+  <div id="modal-overlay" class="modal-overlay hidden" onclick="closeAllModals()"></div>
+
+  <!-- Modal: Topp 10 Hall of Fame -->
+  <div id="top10-modal" class="modal hidden">
+    <h2>📊 Topp 10 Hall of Fame</h2>
+    <p class="subtitle" style="font-size:0.85rem; margin-bottom:15px;">Sammenlagt poengstilling på Løland Gård</p>
+    <div id="top10-content">
+      <!-- Fylles dynamisk fra JS -->
+    </div>
+    <button class="btn btn-secondary" onclick="closeAllModals()" style="margin-top: 20px;">Lukk</button>
+  </div>
+
+  <!-- Modal: Kveldsnotater / Dagbok -->
+  <div id="notes-modal" class="modal hidden">
+    <h2>📝 Kveldsnotater / Dagbok</h2>
+    <textarea id="modal-notes" rows="6" style="width:100%; margin-top:10px; padding:10px;" placeholder="Skriv inn notater for kvelden..."></textarea>
+    <button class="btn btn-primary" onclick="saveNotesFromModal()" style="margin-top: 15px;">Lagre Notater</button>
+    <button class="btn btn-secondary" onclick="closeAllModals()" style="margin-top: 10px;">Lukk</button>
+  </div>
+
+  <!-- Modal: Historisk Arkiv -->
+  <div id="archive-modal" class="modal hidden">
+    <h2>📜 Historisk Arkiv</h2>
+    <p>Tidligere spillekvelder og historikk lastes inn her...</p>
+    <button class="btn btn-secondary" onclick="closeAllModals()" style="margin-top: 15px;">Lukk</button>
+  </div>
+
+  <!-- Modal: Om Spillet -->
+  <div id="about-modal" class="modal hidden">
+    <h2>Om Løland Gård Poker</h2>
+    <p>Dette systemet er skreddersydd for pokerkveldene på Løland Gård. Det styrer kveldsadministrasjon, utslåing, poengberegning og historikk, mens sjetonger og betting håndteres fysisk rundt bordet.</p>
+    <p><strong>Faste spillere:</strong> Kai, Ronny, Einar, Joakim og Odd Christian.</p>
+    <button class="btn btn-secondary" onclick="closeAllModals()" style="margin-top: 15px;">Lukk</button>
+  </div>
+
+  <!-- Modal: Brukerveiledning -->
+  <div id="guide-modal" class="modal hidden">
+    <h2>Brukerveiledning</h2>
+    <ol style="padding-left: 20px; line-height: 1.6;">
+      <li><strong>Pre-Game:</strong> Verten velges, spillere logger inn via QR-kode på mobilen. Klikk "Start Spillekveld".</li>
+      <li><strong>Under spill (Active Game):</strong> Når en spiller ryker ut av omgangen, vippes spillerens bryter til rød på dashboardet. Du kan bytte mellom Omaha og Texas Hold'em med ett trykk øverst.</li>
+      <li><strong>Showdown & Omgangsslutt:</strong> Skriv inn eller skann felleskort og spillernes hender. Systemet rangerer automatisk vinnere via Pokersolver.</li>
+    </ol>
+    <button class="btn btn-secondary" onclick="closeAllModals()" style="margin-top: 15px;">Lukk</button>
+  </div>
+
+  <!-- Modal: Innstillinger -->
+  <div id="settings-modal" class="modal hidden">
+    <h2>⚙️ Systeminnstillinger</h2>
+    <div class="form-group" style="margin-top: 15px;">
+      <label for="default-game-type">Standard Pokertype ved oppstart:</label>
+      <select id="default-game-type" onchange="saveDefaultGameType(this.value)">
+        <option value="Omaha">Omaha (Anbefalt)</option>
+        <option value="Texas Hold'em">Texas Hold'em</option>
+      </select>
+    </div>
+    <p class="subtitle" style="font-size: 0.85rem; margin-top: 10px;">
+      Dette valget bestemmer hva systemet foreslår som standard når du starter en ny kveld. Du kan fortsatt bytte fritt per omgang.
+    </p>
+    <button class="btn btn-secondary" onclick="closeAllModals()" style="margin-top: 15px;">Lagre & Lukk</button>
+  </div>
+
+  <!-- System JavaScript -->
+  <script src="app.js"></script>
 </body>
 </html>
