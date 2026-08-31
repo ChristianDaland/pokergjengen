@@ -2,131 +2,271 @@
 <html lang="no">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Løland Gård Poker</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Løland Gård Poker - Hovedpanel</title>
   <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+
+    /* Topplinje med snarvei til storskjerm og meny */
+    .top-bar {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .open-board-btn {
+      background: #059669;
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    .open-board-btn:hover {
+      background: #10b981;
+    }
+
+    .hamburger-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: white;
+      font-size: 1.2rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 45px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      width: 220px;
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    .dropdown-menu.show {
+      display: block;
+    }
+
+    .dropdown-menu a {
+      display: block;
+      padding: 12px 16px;
+      color: #f8fafc;
+      text-decoration: none;
+      font-size: 0.95rem;
+      border-bottom: 1px solid #334155;
+    }
+
+    .dropdown-menu a:hover {
+      background: #334155;
+    }
+
+    .card-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: white;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+
+    .action-btn {
+      background: #2563eb;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      margin-top: 15px;
+    }
+
+    .cards-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .playing-card {
+      background: #ffffff;
+      color: #0f172a;
+      width: 65px;
+      height: 95px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6px;
+      font-weight: bold;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    }
+
+    .badge {
+      display: inline-block;
+      background: #ffd700;
+      color: #0f172a;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+  </style>
 </head>
-<body style="background-color: #0f172a; color: #f8fafc; font-family: sans-serif; margin: 0; padding: 20px;">
+<body>
 
-  <div style="max-width: 1100px; margin: 0 auto;">
-    
-    <!-- HEADER MED HAMBURGERMENY -->
-    <header style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; padding-bottom: 15px; margin-bottom: 20px; position: relative;">
-      <h1 style="color: #ffd700; margin: 0; font-size: 1.8rem;">♠️ Løland Gård Poker ♥️</h1>
-      
-      <div style="display: flex; align-items: center; gap: 15px;">
-        <div id="game-status-badge" style="background: #1e293b; padding: 8px 16px; border-radius: 20px; font-weight: bold; border: 1px solid #334155;">
-          Fase: <span id="current-phase" style="color: #38bdf8;">VENTING</span>
-        </div>
+  <!-- Topplinje med snarvei til Bordskjerm -->
+  <div class="top-bar">
+    <a href="/board" target="_blank" class="open-board-btn">
+      🖥️ Åpne Bordskjerm
+    </a>
 
-        <!-- HAMBURGERMENY KNAPP -->
-        <button onclick="toggleMenu()" style="background: transparent; border: none; color: white; font-size: 2rem; cursor: pointer; padding: 0 10px;">
-          ☰
-        </button>
-      </div>
-
-      <!-- POPUP MENY -->
-      <div id="dropdown-menu" style="display: none; position: absolute; right: 0; top: 60px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,0.5); z-index: 100; width: 200px;">
-        <button onclick="resetSession()" style="width: 100%; text-align: left; padding: 12px 16px; background: none; border: none; color: #ef4444; font-weight: bold; cursor: pointer;">
-          🔄 Avslutt & Start Ny Kveld
-        </button>
-      </div>
-    </header>
-
-    <!-- FASE 1: OPSETT OG QR-KODE (Vises når sessionStarted = false) -->
-    <div id="setup-view" style="display: block;">
-      <div style="background: #1e293b; padding: 25px; border-radius: 12px; border: 1px solid #334155; max-width: 600px; margin: 20px auto;">
-        
-        <div style="margin-bottom: 15px;">
-          <label style="color: #cbd5e1; display: block; margin-bottom: 5px;">Vert for kvelden:</label>
-          <select id="host-select" style="width: 100%; padding: 10px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569;">
-            <option value="Odd Christian">Odd Christian</option>
-            <option value="Kai">Kai</option>
-            <option value="Ronny">Ronny</option>
-            <option value="Einar">Einar</option>
-            <option value="Joakim">Joakim</option>
-          </select>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-          <label style="color: #cbd5e1; display: block; margin-bottom: 5px;">Spillemodus for 1. omgang:</label>
-          <select id="mode-select" style="width: 100%; padding: 10px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569;">
-            <option value="OMAHA">Omaha</option>
-            <option value="TEXAS">Texas Hold'em</option>
-          </select>
-        </div>
-
-        <!-- QR-KODE SEKSJON -->
-        <div style="background: #0f172a; padding: 20px; border-radius: 8px; border: 1px solid #334155; text-align: center; margin-bottom: 20px;">
-          <h4 style="margin-top: 0; color: #38bdf8;">Pålogging for spillere:</h4>
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=https://pokergjengen.onrender.com/mobile.html" alt="QR Kode" style="border: 4px solid white; border-radius: 8px;">
-          <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 10px; margin-bottom: 0;">Skann QR-koden med mobilen for å koble til</p>
-        </div>
-
-        <!-- TILKOBLEDE SPILLERE I LOBBY -->
-        <div style="margin-bottom: 20px;">
-          <strong style="color: #cbd5e1;">Tilkoblede spillere:</strong>
-          <div id="lobby-players-list" style="margin-top: 8px; color: #94a3b8; font-style: italic;">
-            Ingen spillere har logget inn ennå...
-          </div>
-        </div>
-
-        <button onclick="startSession()" style="width: 100%; padding: 14px; background: #2563eb; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; cursor: pointer;">
-          Start Spillekveld ➔
-        </button>
-
+    <div style="position: relative;">
+      <button class="hamburger-btn" onclick="toggleMenu()">☰ Meny</button>
+      <div class="dropdown-menu" id="dropdown-menu">
+        <a href="/board" target="_blank">🖥️ Åpne Bordskjerm (Ny fane)</a>
+        <a href="#" onclick="changeUser()">👤 Bytt Spiller</a>
       </div>
     </div>
-
-    <!-- FASE 2: BORDVISNING MED SPILLEKORT (Vises når sessionStarted = true) -->
-    <div id="board-view" style="display: none;">
-      
-      <!-- DEALER KONTROLLPANEL -->
-      <div style="background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155;">
-        <h3 style="margin-top: 0; color: #94a3b8;">Dealer Kontrollpanel</h3>
-        <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
-          
-          <div>
-            <label style="font-size: 0.85rem; color: #cbd5e1; display: block; margin-bottom: 4px;">Modus:</label>
-            <button onclick="setGameMode('TEXAS')" style="padding: 8px 14px; background: #0284c7; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Texas Hold'em</button>
-            <button onclick="setGameMode('OMAHA')" style="padding: 8px 14px; background: #0d9488; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Omaha</button>
-          </div>
-
-          <div style="height: 30px; border-left: 1px solid #475569; margin: 0 5px;"></div>
-
-          <button onclick="startNewHand()" style="padding: 10px 18px; background: #16a34a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem;">
-            🎴 Start Ny Hånd
-          </button>
-
-          <button onclick="nextPhase()" style="padding: 10px 18px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem;">
-            ➡️ Neste Fase (Åpne Bord)
-          </button>
-
-        </div>
-      </div>
-
-      <!-- FELLESKORT -->
-      <div style="background: #022c22; padding: 25px; border-radius: 16px; border: 2px solid #15803d; text-align: center; margin-bottom: 25px;">
-        <h2 style="margin-top: 0; color: #86efac; font-size: 1.2rem; letter-spacing: 1px;">FELLESKORT ON THE BOARD</h2>
-        <div id="board-cards" style="display: flex; justify-content: center; gap: 12px; min-height: 90px; align-items: center; margin-top: 15px;">
-          <span style="color: #4ade80; font-style: italic;">Ingen kort på bordet...</span>
-        </div>
-      </div>
-
-      <!-- VINNERBOKS -->
-      <div id="winner-box" style="display: none; background: #854d0e; border: 2px solid #facc15; color: #fef08a; padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 25px; font-size: 1.3rem; font-weight: bold;">
-      </div>
-
-      <!-- SPILLERGRID -->
-      <h3 style="color: #cbd5e1; margin-bottom: 12px;">Spillere rundt bordet:</h3>
-      <div id="players-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
-      </div>
-
-    </div>
-
   </div>
 
-  <script src="app.js"></script>
+  <!-- Innloggingsseksjon -->
+  <div class="card-box" id="login-section">
+    <h2 style="color: #ffd700; margin-top: 0;">♠️ Løland Poker ♥️</h2>
+    <label style="color: #cbd5e1; display: block; text-align: left;">Velg din bruker:</label>
+    <select id="player-select">
+      <option value="Odd Christian">Odd Christian</option>
+      <option value="Kai">Kai</option>
+      <option value="Ronny">Ronny</option>
+      <option value="Einar">Einar</option>
+      <option value="Joakim">Joakim</option>
+    </select>
+    <button class="action-btn" onclick="joinGame()">Koble til bordet</button>
+  </div>
+
+  <!-- Spillerområde -->
+  <div class="card-box" id="game-section" style="display: none;">
+    <div id="role-badge-container"></div>
+    <h3 style="margin: 0; color: #94a3b8;">Dine kort:</h3>
+    <h1 id="player-display-name" style="margin: 5px 0 15px 0; color: #38bdf8;"></h1>
+
+    <div id="my-cards" class="cards-container">
+      <p style="color: #64748b; font-style: italic;">Venter på at dealeren skal dele ut kort...</p>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    let myName = localStorage.getItem('poker_player_name') || '';
+
+    if (myName) {
+      autoJoin(myName);
+    }
+
+    function toggleMenu() {
+      document.getElementById('dropdown-menu').classList.toggle('show');
+    }
+
+    function changeUser() {
+      localStorage.removeItem('poker_player_name');
+      location.reload();
+    }
+
+    function joinGame() {
+      const selected = document.getElementById('player-select').value;
+      localStorage.setItem('poker_player_name', selected);
+      autoJoin(selected);
+    }
+
+    function autoJoin(name) {
+      myName = name;
+      document.getElementById('login-section').style.display = 'none';
+      document.getElementById('game-section').style.display = 'block';
+      document.getElementById('player-display-name').innerText = name;
+
+      socket.emit('playerJoined', { playerName: name });
+    }
+
+    socket.on('your_cards', (data) => {
+      const container = document.getElementById('my-cards');
+      const badgeContainer = document.getElementById('role-badge-container');
+
+      if (data.role) {
+        badgeContainer.innerHTML = `<span class="badge">${data.role}</span>`;
+      } else {
+        badgeContainer.innerHTML = '';
+      }
+
+      if (data.cards && data.cards.length > 0) {
+        container.innerHTML = data.cards.map(card => formatCardHTML(card)).join('');
+      } else {
+        container.innerHTML = `<p style="color: #64748b; font-style: italic;">Venter på at dealeren skal dele ut kort...</p>`;
+      }
+    });
+
+    function formatCardHTML(cardString) {
+      if (!cardString || cardString.length < 2) return '';
+      
+      const value = cardString.slice(0, -1).replace('T', '10');
+      const suit = cardString.slice(-1).toLowerCase();
+
+      let symbol = suit;
+      let color = 'white';
+
+      if (suit === 's') { symbol = '♠'; color = '#0f172a'; }
+      if (suit === 'h') { symbol = '♥'; color = '#ef4444'; }
+      if (suit === 'd') { symbol = '♦'; color = '#38bdf8'; }
+      if (suit === 'c') { symbol = '♣'; color = '#22c55e'; }
+
+      return `
+        <div class="playing-card">
+          <div style="text-align: left; font-size: 1.1rem; color: ${color};">${value}</div>
+          <div style="text-align: center; font-size: 1.6rem; color: ${color};">${symbol}</div>
+        </div>
+      `;
+    }
+  </script>
 </body>
 </html>

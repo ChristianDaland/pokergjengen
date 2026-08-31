@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Løland Gård Poker - Mobil Hand</title>
+  <title>Løland Gård Poker - Mobil & Kontroll</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     body {
@@ -20,19 +20,40 @@
       position: relative;
     }
 
-    /* Hamburgermeny */
-    .menu-container {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      z-index: 100;
+    /* Topplinje med direkteknapp og hamburgermeny */
+    .top-bar {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .open-board-btn {
+      background: #059669;
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    .open-board-btn:hover {
+      background: #10b981;
     }
 
     .hamburger-btn {
       background: #1e293b;
       border: 1px solid #334155;
       color: white;
-      font-size: 1.4rem;
+      font-size: 1.2rem;
       padding: 6px 12px;
       border-radius: 8px;
       cursor: pointer;
@@ -48,6 +69,7 @@
       border-radius: 8px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
       width: 220px;
+      z-index: 100;
       overflow: hidden;
     }
 
@@ -77,7 +99,6 @@
       max-width: 400px;
       text-align: center;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      margin-top: 40px;
     }
 
     input, select, button {
@@ -92,7 +113,7 @@
       box-sizing: border-box;
     }
 
-    button {
+    .action-btn {
       background: #2563eb;
       font-weight: bold;
       border: none;
@@ -137,15 +158,22 @@
 </head>
 <body>
 
-  <!-- Hamburgermeny -->
-  <div class="menu-container">
-    <button class="hamburger-btn" onclick="toggleMenu()">☰</button>
-    <div class="dropdown-menu" id="dropdown-menu">
-      <a href="/board" target="_blank">🖥️ Åpne Bordvisning</a>
-      <a href="#" onclick="changeUser()">👤 Bytt Bruker</a>
+  <!-- Topplinje med direkteknapp til Bordskjermen -->
+  <div class="top-bar">
+    <a href="/board" target="_blank" class="open-board-btn">
+      🖥️ Åpne Bordskjerm
+    </a>
+
+    <div style="position: relative;">
+      <button class="hamburger-btn" onclick="toggleMenu()">☰ Meny</button>
+      <div class="dropdown-menu" id="dropdown-menu">
+        <a href="/board" target="_blank">🖥️ Åpne Bordskjerm (Ny fane)</a>
+        <a href="#" onclick="changeUser()">👤 Bytt Spiller</a>
+      </div>
     </div>
   </div>
 
+  <!-- Innloggingsseksjon -->
   <div class="card-box" id="login-section">
     <h2 style="color: #ffd700; margin-top: 0;">♠️ Bli med på spillet ♥️</h2>
     <label style="color: #cbd5e1; display: block; text-align: left;">Velg navnet ditt:</label>
@@ -156,9 +184,10 @@
       <option value="Einar">Einar</option>
       <option value="Joakim">Joakim</option>
     </select>
-    <button onclick="joinGame()">Koble til bordet</button>
+    <button class="action-btn" onclick="joinGame()">Koble til bordet</button>
   </div>
 
+  <!-- Spillerområde -->
   <div class="card-box" id="game-section" style="display: none;">
     <div id="role-badge-container"></div>
     <h3 style="margin: 0; color: #94a3b8;">Dine kort:</h3>
