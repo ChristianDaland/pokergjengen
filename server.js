@@ -18,7 +18,6 @@ const DEFAULT_PLAYERS = ['Einar', 'Kai', 'Ronny', 'Joakim', 'Odd Christian'];
 
 async function initDB() {
   try {
-    // 1. Tabell for hånd-historikk med ren hand_score (BIGINT/INT)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS hand_history (
         id SERIAL PRIMARY KEY,
@@ -36,7 +35,6 @@ async function initDB() {
       ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS hand_score BIGINT DEFAULT 0;
     `);
 
-    // 2. Tabell for dynamisk spillerliste
     await pool.query(`
       CREATE TABLE IF NOT EXISTS players (
         id SERIAL PRIMARY KEY,
@@ -49,16 +47,12 @@ async function initDB() {
       for (const name of DEFAULT_PLAYERS) {
         await pool.query('INSERT INTO players (name) VALUES ($1) ON CONFLICT DO NOTHING', [name]);
       }
-      console.log("Satte inn standardspillere i databasen.");
     }
-
-    console.log("Database-tabeller er klare!");
   } catch (err) {
-    console.error("Feil ved opprettelse av databasetabeller:", err);
+    console.error("Feil ved initDB:", err);
   }
 }
 initDB();
-// -----------------------------------
 
 app.use(express.static('public'));
 
@@ -96,7 +90,6 @@ function translateHandDescription(descr) {
   text = text.replace(/Two Pair/g, 'To Par');
   text = text.replace(/Pair/g, 'Ett Par');
   text = text.replace(/High Card/g, 'Høyt Kort');
-
   text = text.replace(/Spades/g, 'Spar');
   text = text.replace(/Hearts/g, 'Hjerter');
   text = text.replace(/Diamonds/g, 'Ruter');
@@ -104,15 +97,10 @@ function translateHandDescription(descr) {
   return text;
 }
 
-// Beregner en unikk og sammenlignbar poengsum med vanlige tall
 function calculateHandScore(solvedHand) {
   if (!solvedHand) return 0;
-
-  // Hovedkategori (0-9) vektes høyest (f.eks. 9 * 10 000 000)
   let rank = Number(solvedHand.rank) || 0;
   let score = rank * 10000000;
-
-  // pokersolver returnerer 'values' i synkende rekkefølge
   if (solvedHand.values && Array.isArray(solvedHand.values)) {
     let multiplier = 100000;
     for (let val of solvedHand.values) {
@@ -120,7 +108,6 @@ function calculateHandScore(solvedHand) {
       multiplier = Math.floor(multiplier / 15);
     }
   }
-
   return Math.floor(score);
 }
 
@@ -132,13 +119,11 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
     for (let i = 0; i < playerCards.length; i++) {
       for (let j = i + 1; j < playerCards.length; j++) {
         const hand2 = [playerCards[i], playerCards[j]];
-
         for (let b1 = 0; b1 < boardCards.length; b1++) {
           for (let b2 = b1 + 1; b2 < boardCards.length; b2++) {
             for (let b3 = b2 + 1; b3 < boardCards.length; b3++) {
               const board3 = [boardCards[b1], boardCards[b2], boardCards[b3]];
               const combo = Hand.solve([...hand2, ...board3]);
-              
               if (!bestHand) {
                 bestHand = combo;
               } else {
@@ -201,7 +186,8 @@ function startNewHandLogic() {
   gameState.dealerIndex = (gameState.dealerIndex + 1) % playerList.length;
 
   playerList.forEach((p, idx) => {
-    p.folded = false;
+    // Hvis spilleren er slått ut fra omgangen, deles det ikke ut kort
+    p.folded = p.isEliminated || false;
     p.cards = [];
     
     const relativePos = (idx - gameState.dealerIndex + playerList.length) % playerList.length;
@@ -215,55 +201,68 @@ function startNewHandLogic() {
       else p.role = '';
     }
     
-    const cardCount = gameState.gameMode === 'OMAHA' ? 4 : 2;
-    for (let i = 0; i < cardCount; i++) {
-      p.cards.push(gameState.deck.pop());
+    if (!p.isEliminated) {
+      const cardCount = gameState.gameMode === 'OMAHA' ? 4 : 2;
+      for (let i = 0; i < cardCount; i++) {
+        p.cards.push(gameState.deck.pop());
+      }
     }
   });
 }
 
-async function sendPresetPlayers(targetSocket = null) {
-  try {
-    const res = await pool.query('SELECT name FROM players ORDER BY id ASC');
-    const playerNames = res.rows.map(r => r.name);
-    if (targetSocket) {
-      targetSocket.emit('preset_players', playerNames);
-    } else {
-      io.emit('preset_players', playerNames);
-    }
-  } catch (err) {
-    console.error("Feil ved henting av spillere:", err);
-    if (targetSocket) targetSocket.emit('preset_players', DEFAULT_PLAYERS);
-  }
+// Tilbakestiller alle utslåtte spillere ved ny omgang
+function resetEliminations() {
+  Object.values(players).forEach(p => {
+    p.isEliminated = false;
+    p.eliminationRank = null;
+  });
 }
 
 function formatToNorwegianTime(dateInput) {
   if (!dateInput) return '';
   const d = new Date(dateInput);
-  
   const options = {
     timeZone: 'Europe/Oslo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
   };
-
   const parts = new Intl.DateTimeFormat('nb-NO', options).formatToParts(d);
   const hash = {};
   parts.forEach(p => hash[p.type] = p.value);
-
   return `${hash.year}-${hash.month}-${hash.day} ${hash.hour}:${hash.minute}`;
 }
 
 io.on('connection', (socket) => {
-  sendPresetPlayers(socket);
+  // Bytte status for utslått spiller
+  socket.on('toggle_player_eliminated', (targetPlayerId) => {
+    const player = players[targetPlayerId];
+    if (!player) return;
+
+    if (!player.isEliminated) {
+      // Merk som utslått: Finn laveste ledige plassering
+      const activeCount = Object.values(players).filter(p => !p.isEliminated).length;
+      player.isEliminated = true;
+      player.eliminationRank = activeCount; // eks. 5. plass om 5 var aktive
+      player.folded = true;
+    } else {
+      // Tilbakestill til aktiv (feilretting)
+      player.isEliminated = false;
+      player.eliminationRank = null;
+      player.folded = false;
+    }
+
+    updateAll();
+  });
+
+  // Start helt ny omgang (tilbakestiller brytere til grønn)
+  socket.on('start_new_round', () => {
+    resetEliminations();
+    startNewHandLogic();
+    updateAll();
+  });
 
   socket.on('join_game', (name) => {
     const cleanName = name ? name.trim() : 'Spiller';
-    
     let existingPlayerKey = Object.keys(players).find(
       key => players[key].name.toLowerCase() === cleanName.toLowerCase()
     );
@@ -271,12 +270,10 @@ io.on('connection', (socket) => {
     if (existingPlayerKey) {
       const playerData = players[existingPlayerKey];
       delete players[existingPlayerKey];
-      
       if (disconnectTimeouts[existingPlayerKey]) {
         clearTimeout(disconnectTimeouts[existingPlayerKey]);
         delete disconnectTimeouts[existingPlayerKey];
       }
-
       playerData.id = socket.id;
       playerData.connected = true;
       players[socket.id] = playerData;
@@ -288,18 +285,13 @@ io.on('connection', (socket) => {
         seat: seatNumber,
         cards: [],
         folded: false,
+        isEliminated: false,
+        eliminationRank: null,
         role: '',
         connected: true,
         points: 0
       };
     }
-
-    updateAll();
-  });
-
-  socket.on('set_gamenight', (data) => {
-    gameState.gameNight.host = data.host || '';
-    gameState.gameNight.location = data.location || '';
     updateAll();
   });
 
@@ -310,6 +302,7 @@ io.on('connection', (socket) => {
       gameState.board = [];
       gameState.winnerInfo = null;
     } else {
+      resetEliminations();
       randomizePlayerSeats();
     }
     updateAll();
@@ -321,16 +314,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('next_phase', async () => {
-    const activePlayers = Object.values(players).filter(p => !p.folded);
+    const activePlayers = Object.values(players).filter(p => !p.folded && !p.isEliminated);
 
-    // Hvis spillet er ferdig eller i Showdown, vil neste klikk alltid starte en ny hånd
     if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
       startNewHandLogic();
       updateAll();
       return;
     }
 
-    // Hvis alle unntatt én har kastet seg
     if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
       gameState.phase = 'FINISHED';
       gameState.winnerInfo = {
@@ -343,7 +334,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Stegvis utdeling av bordkort
     if (gameState.phase === 'PREFLOP') {
       gameState.phase = 'FLOP';
       gameState.board = [gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop()];
@@ -370,9 +360,7 @@ io.on('connection', (socket) => {
         if (winners.length > 1) {
           const names = winners.map(w => w.player.name).join(' & ');
           winnerText = `UAVGJOERT / DELING: ${names}`;
-          winners.forEach(w => {
-            w.player.points = (w.player.points || 0) + 1;
-          });
+          winners.forEach(w => { w.player.points = (w.player.points || 0) + 1; });
         } else if (winners.length === 1) {
           winnerText = winners[0].player.name;
           winners[0].player.points = (winners[0].player.points || 0) + 2;
@@ -381,8 +369,6 @@ io.on('connection', (socket) => {
         const topWinner = winners[0] || solvedHands[0];
         const rawDescr = topWinner && topWinner.solved ? topWinner.solved.descr : 'Ukjent hånd';
         const translatedHand = translateHandDescription(rawDescr);
-        
-        // Trygg henting og konvertering av tallverdier
         const handRank = (topWinner && topWinner.solved && topWinner.solved.rank) ? Number(topWinner.solved.rank) : 0;
         const handScore = topWinner && topWinner.solved ? calculateHandScore(topWinner.solved) : 0;
 
@@ -392,130 +378,26 @@ io.on('connection', (socket) => {
           foldedWin: false
         };
 
-        // Lagre i databasen og skriv ut status i loggen
-        const insertRes = await pool.query(
-          'INSERT INTO hand_history (player, hand, hand_rank, hand_score, game_mode) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+        await pool.query(
+          'INSERT INTO hand_history (player, hand, hand_rank, hand_score, game_mode) VALUES ($1, $2, $3, $4, $5)',
           [winnerText, translatedHand, handRank, handScore, gameState.gameMode || 'TEXAS']
         );
-        console.log(`[DB] Ny hånd registrert i historikk! ID: ${insertRes.rows[0].id}, Vinner: ${winnerText}, Poeng: ${handScore}`);
-
       } catch (err) {
-        console.error("Feil under evaluering av SHOWDOWN / DB-lagring:", err);
+        console.error("Feil ved SHOWDOWN:", err);
       }
     }
-    
     updateAll();
-  });
-
-  socket.on('player_fold', () => {
-    if (players[socket.id]) {
-      players[socket.id].folded = true;
-      const activePlayers = Object.values(players).filter(p => !p.folded);
-      if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
-        gameState.phase = 'FINISHED';
-        gameState.winnerInfo = {
-          winnerName: activePlayers[0].name,
-          descr: 'Alle andre kastet seg',
-          foldedWin: true
-        };
-        activePlayers[0].points = (activePlayers[0].points || 0) + 1;
-      }
-      updateAll();
-    }
-  });
-
-  socket.on('get_top10', async (data) => {
-    const rawPeriod = (data && data.period) ? String(data.period).toLowerCase() : 'tonight';
-    let timeQuery = '';
-
-    // Tilpasset støtte for alle mulige strenger fra frontend
-    if (rawPeriod === 'tonight' || rawPeriod === 'kveld' || rawPeriod === 'kveldens') {
-      timeQuery = "WHERE created_at >= NOW() - INTERVAL '24 hours'";
-    } else if (rawPeriod === 'month' || rawPeriod === 'måned' || rawPeriod === 'månedens') {
-      timeQuery = "WHERE created_at >= NOW() - INTERVAL '30 days'";
-    } else if (rawPeriod === 'year' || rawPeriod === 'år' || rawPeriod === 'årets') {
-      timeQuery = "WHERE created_at >= NOW() - INTERVAL '1 year'";
-    } else if (rawPeriod === 'all' || rawPeriod === 'ever' || rawPeriod === 'evig') {
-      timeQuery = ""; // Henter alt
-    } else {
-      timeQuery = ""; // Default fallback: Hent alt dersom periode-nøkkelen er ukjent
-    }
-
-    try {
-      const res = await pool.query(`
-        SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
-        FROM hand_history 
-        ${timeQuery}
-        ORDER BY hand_score DESC, id DESC 
-        LIMIT 10
-      `);
-
-      const formattedRows = res.rows.map(r => ({
-        playerName: r.playerName,
-        handDescr: r.handDescr,
-        date: formatToNorwegianTime(r.rawDate)
-      }));
-
-      socket.emit('top10_data', formattedRows);
-    } catch (err) {
-      console.error("Feil ved henting av Topp 10 fra DB:", err);
-      socket.emit('top10_data', []);
-    }
-  });
-
-  socket.on('admin_get_players', async () => {
-    try {
-      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
-      socket.emit('admin_players_list', res.rows);
-    } catch (err) {
-      console.error("Feil ved henting av admin spillere:", err);
-    }
-  });
-
-  socket.on('admin_add_player', async (name) => {
-    if (!name || !name.trim()) return;
-    try {
-      await pool.query('INSERT INTO players (name) VALUES ($1) ON CONFLICT DO NOTHING', [name.trim()]);
-      sendPresetPlayers();
-      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
-      socket.emit('admin_players_list', res.rows);
-    } catch (err) {
-      console.error("Feil ved ny spiller:", err);
-    }
-  });
-
-  socket.on('admin_delete_player', async (id) => {
-    try {
-      await pool.query('DELETE FROM players WHERE id = $1', [id]);
-      sendPresetPlayers();
-      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
-      socket.emit('admin_players_list', res.rows);
-    } catch (err) {
-      console.error("Feil ved sletting av spiller:", err);
-    }
-  });
-
-  socket.on('admin_clear_history', async () => {
-    try {
-      await pool.query('DELETE FROM hand_history');
-      console.log("Håndhistorikk er tømt av admin!");
-      socket.emit('admin_action_success', 'Håndhistorikk / Topp 10 har blitt tømt!');
-    } catch (err) {
-      console.error("Feil ved tømming av historikk:", err);
-    }
   });
 
   socket.on('disconnect', () => {
     if (players[socket.id]) {
       players[socket.id].connected = false;
       const disconnectedId = socket.id;
-
       disconnectTimeouts[disconnectedId] = setTimeout(() => {
         delete players[disconnectedId];
         delete disconnectTimeouts[disconnectedId];
         updateAll();
       }, 45000);
-
       updateAll();
     }
   });
@@ -537,23 +419,12 @@ function updateAll() {
       seat: p.seat,
       role: p.role,
       folded: p.folded,
+      isEliminated: p.isEliminated || false,
+      eliminationRank: p.eliminationRank || null,
       connected: p.connected,
       points: p.points || 0,
       cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
-  });
-
-  playerList.forEach(p => {
-    if (p.connected) {
-      io.to(p.id).emit('player_state', {
-        phase: gameState.phase,
-        cards: p.cards,
-        role: p.role,
-        folded: p.folded,
-        winnerInfo: gameState.winnerInfo,
-        points: p.points || 0
-      });
-    }
   });
 }
 
