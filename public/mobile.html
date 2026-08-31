@@ -7,95 +7,54 @@
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
-<body style="padding: 15px;">
+<body style="padding: 20px; background-color: #0f172a; color: #f8fafc; font-family: sans-serif;">
 
-  <div class="setup-card" style="max-width: 500px; margin: 0 auto;">
-    <h2 style="color: #ffd700; text-align: center; margin-bottom: 15px;">♠️ Mobil Spillerklient ♥️</h2>
+  <div style="max-width: 400px; margin: 40px auto; background: #1e293b; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+    <h2 style="color: #ffd700; text-align: center; margin-bottom: 20px;">♠️ Bli med på spillet ♥️</h2>
     
-    <!-- INNLOGGING / VELG SPILLER -->
     <div id="login-section">
-      <div class="form-group">
-        <label for="player-select">Velg hvem du er:</label>
-        <select id="player-select">
-          <option value="" disabled selected>-- Velg ditt navn --</option>
-          <option value="Kai">Kai</option>
-          <option value="Ronny">Ronny</option>
-          <option value="Einar">Einar</option>
-          <option value="Joakim">Joakim</option>
-          <option value="Odd Christian">Odd Christian</option>
-        </select>
-      </div>
+      <label style="display: block; margin-bottom: 8px; color: #94a3b8;">Velg hvem du er:</label>
+      <select id="player-select" style="width: 100%; padding: 12px; border-radius: 6px; background: #0f172a; color: #fff; border: 1px solid #334155; margin-bottom: 20px; font-size: 1rem;">
+        <option value="" disabled selected>-- Velg ditt navn --</option>
+        <option value="Kai">Kai</option>
+        <option value="Ronny">Ronny</option>
+        <option value="Einar">Einar</option>
+        <option value="Joakim">Joakim</option>
+        <option value="Odd Christian">Odd Christian</option>
+      </select>
 
-      <button id="join-btn" class="btn btn-primary" onclick="joinGame()" style="margin-top: 10px;">
+      <button onclick="joinGame()" style="width: 100%; padding: 14px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer;">
         Koble til spillet ➔
       </button>
     </div>
 
-    <!-- DASHBOARD FOR AKTIV SPILLER (Skjult før innlogging) -->
-    <div id="active-section" class="hidden">
-      <div style="background-color: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 20px; text-align: center;">
-        <span style="color: #94a3b8; font-size: 0.9rem;">Logget inn som:</span>
-        <h3 id="current-player-display" style="color: #22c55e; font-size: 1.4rem; margin-top: 4px;"></h3>
+    <div id="status-section" style="display: none; text-align: center;">
+      <p style="color: #94a3b8; margin-bottom: 5px;">Du er nå pålogget som:</p>
+      <h3 id="player-display" style="color: #22c55e; font-size: 1.6rem; margin: 0 0 15px 0;"></h3>
+      <div style="padding: 12px; background: #0f172a; border-radius: 6px; border: 1px solid #334155; color: #cbd5e1; font-size: 0.9rem;">
+        Følg med på hovedskjermen på bordet! Dealer styrer spillet derfra.
       </div>
-
-      <!-- Send inn egne kort -->
-      <div class="form-group">
-        <label for="mobile-card-input">Send inn dine kort / hånd:</label>
-        <input type="text" id="mobile-card-input" placeholder="f.eks. Ah Kd 10s 7c" style="text-align: center; font-size: 1.1rem; text-transform: uppercase;">
-        <span style="font-size: 0.8rem; color: #94a3b8; text-align: center; display: block; margin-top: 4px;">
-          Bruk format som: Ah Kd Qs (A=Ess, K=Konge, Q=Dame, J=Knekt, s/h/d/c=spard/hjerter/ruter/kløver)
-        </span>
-      </div>
-
-      <button class="btn btn-primary" onclick="sendCards()" style="margin-top: 10px;">
-        Send kort til hovedskjerm 📤
-      </button>
-
-      <div id="status-message" style="margin-top: 15px; text-align: center; font-weight: bold; color: #22c55e;"></div>
     </div>
   </div>
 
   <script>
     const socket = io();
-    let selectedPlayerName = "";
 
     function joinGame() {
-      const selectElem = document.getElementById('player-select');
-      const name = selectElem.value;
+      const select = document.getElementById('player-select');
+      const name = select.value;
 
       if (!name) {
-        alert("Vennligst velg navnet ditt fra listen!");
+        alert("Vennligst velg navnet ditt!");
         return;
       }
 
-      selectedPlayerName = name;
+      // Kaller den eksisterende join_game funksjonen i server.js
+      socket.emit('join_game', name);
 
-      // Send join-event til serveren som matcher app.js (playerJoined)
-      socket.emit('playerJoined', { playerName: name });
-
-      // Oppdater brukergrensesnitt
-      document.getElementById('login-section').classList.add('hidden');
-      document.getElementById('active-section').classList.remove('hidden');
-      document.getElementById('current-player-display').innerText = name;
-    }
-
-    function sendCards() {
-      const cardInput = document.getElementById('mobile-card-input').value.trim();
-
-      if (!cardInput) {
-        alert("Vennligst skriv inn kortene dine først.");
-        return;
-      }
-
-      // Send skannede/skrevne kort til serveren
-      socket.emit('cardsScanned', {
-        playerName: selectedPlayerName,
-        cards: cardInput
-      });
-
-      const statusMsg = document.getElementById('status-message');
-      statusMsg.innerText = "✓ Kortene ble sendt til bordet!";
-      setTimeout(() => { statusMsg.innerText = ""; }, 3000);
+      document.getElementById('login-section').style.display = 'none';
+      document.getElementById('status-section').style.display = 'block';
+      document.getElementById('player-display').innerText = name;
     }
   </script>
 
