@@ -201,7 +201,6 @@ function startNewHandLogic() {
   });
 }
 
-// Hjelpefunksjon for å sende oppdatert spillerliste til alle
 async function sendPresetPlayers(targetSocket = null) {
   try {
     const res = await pool.query('SELECT name FROM players ORDER BY id ASC');
@@ -218,7 +217,6 @@ async function sendPresetPlayers(targetSocket = null) {
 }
 
 io.on('connection', (socket) => {
-  // Send dynamisk spillerliste ved tilkobling
   sendPresetPlayers(socket);
 
   socket.on('join_game', (name) => {
@@ -373,36 +371,53 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Henter Topp 10 vinnerhender sortert etter BEST HÅND (hand_rank DESC)
   socket.on('get_top10', async (data) => {
     const period = data ? data.period : 'tonight';
     let timeQuery = '';
 
+    // Bruker Europe/Oslo tidssone for å avgrense kveld, måned og år korrekt
     if (period === 'tonight') {
-      timeQuery = "WHERE created_at >= CURRENT_DATE";
+      timeQuery = "WHERE created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Oslo')::date AT TIME ZONE 'Europe/Oslo'";
     } else if (period === 'month') {
-      timeQuery = "WHERE created_at >= date_trunc('month', CURRENT_DATE)";
+      timeQuery = "WHERE created_at >= date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Oslo') AT TIME ZONE 'Europe/Oslo'";
     } else if (period === 'year') {
-      timeQuery = "WHERE created_at >= date_trunc('year', CURRENT_DATE)";
+      timeQuery = "WHERE created_at >= date_trunc('year', CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Oslo') AT TIME ZONE 'Europe/Oslo'";
     }
 
     try {
+      // Henter ut ekte UTC ISO-streng slik at nettleseren konverterer til riktig lokal tid
       const res = await pool.query(`
-        SELECT player AS "playerName", hand AS "handDescr", TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI') AS date 
+        SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
         FROM hand_history 
         ${timeQuery}
         ORDER BY hand_rank DESC, id DESC 
         LIMIT 10
       `);
-      socket.emit('top10_data', res.rows);
+
+      // Formaterer datoen til lokal norsk tid før den sendes til klienten
+      const formattedRows = res.rows.map(r => {
+        const d = new Date(r.rawDate);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+
+        return {
+          playerName: r.playerName,
+          handDescr: r.handDescr,
+          date: `${year}-${month}-${day} ${hours}:${minutes}`
+        };
+      });
+
+      socket.emit('top10_data', formattedRows);
     } catch (err) {
       console.error("Feil ved henting av Topp 10 fra DB:", err);
       socket.emit('top10_data', []);
     }
   });
 
-  // --- ADMIN SYSTEM-LYTTERE ---
-
-  // Hent alle spillere for Admin-panelet
   socket.on('admin_get_players', async () => {
     try {
       const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
@@ -412,7 +427,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Legg til ny spiller
   socket.on('admin_add_player', async (name) => {
     if (!name || !name.trim()) return;
     try {
@@ -425,7 +439,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Slett spiller
   socket.on('admin_delete_player', async (id) => {
     try {
       await pool.query('DELETE FROM players WHERE id = $1', [id]);
@@ -437,7 +450,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Tøm håndhistorikk (Slett alt i Topp 10)
   socket.on('admin_clear_history', async () => {
     try {
       await pool.query('DELETE FROM hand_history');
