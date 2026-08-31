@@ -15,16 +15,16 @@ const io = new Server(server, {
   }
 });
 
-// Server statiske filer fra rotmappen
-app.use(express.static(__dirname));
+// Server statiske filer fra 'public'-mappen
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Eksplisitte routes for å forhindre "Cannot GET /"
+// Routes som peker til filene inne i 'public'
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.get('/mobile', (req, res) => {
-  res.sendFile(path.join(__dirname, 'mobile.html'));
+  res.sendFile(path.join(__dirname, 'public', 'mobile.html'));
 });
 
 // Global tilstand for spillet
@@ -54,7 +54,6 @@ io.on('connection', (socket) => {
 
   // Spiller blir med fra mobil
   socket.on('join_game', (data) => {
-    // Håndter om data er en streng (f.eks. fra mobile.html) eller et objekt
     const name = typeof data === 'string' ? data : (data?.name || 'Anonym');
 
     players[socket.id] = {
@@ -75,7 +74,6 @@ io.on('connection', (socket) => {
     gameState.pot = 0;
     gameState.communityCards = [];
 
-    // Tilbakestill spillere for ny runde
     Object.keys(players).forEach((id) => {
       players[id].folded = false;
       players[id].cards = [];
@@ -113,7 +111,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start serveren på angitt port (Render setter process.env.PORT automatisk)
+// Start serveren
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server kjører på port ${PORT}`);
