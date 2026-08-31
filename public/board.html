@@ -6,90 +6,209 @@
   <title>Løland Gård Poker - Bordskjerm</title>
   <style>
     * { box-sizing: border-box; }
+
     body {
       font-family: Arial, sans-serif;
       background-color: #1b4332;
       color: white;
       margin: 0;
-      padding: 20px;
+      padding: 0;
       height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Topbar for kontroll av zoom/kortstørrelse */
+    .board-header {
+      display: flex;
+      justify-content: flex-end;
       align-items: center;
-      justify-content: space-between;
+      padding: 10px 20px;
+      background: rgba(0,0,0,0.2);
     }
 
-    .info-header {
+    .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       background: #081c15;
-      padding: 10px 30px;
+      padding: 6px 14px;
       border-radius: 20px;
-      font-size: 1.4rem;
-      border: 2px solid #52b788;
+      font-size: 0.85rem;
     }
 
-    .community-area {
+    .zoom-btn {
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .reset-btn {
+      background: #0288d1;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    /* Selve Pokerbordet */
+    .table-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 30px;
+    }
+
+    .info-bar {
+      background: rgba(8, 28, 21, 0.8);
+      border: 2px solid #52b788;
+      padding: 8px 24px;
+      border-radius: 20px;
+      font-size: 1.2rem;
+    }
+
+    .winner-banner {
+      background: #ff9800;
+      color: black;
+      font-weight: bold;
+      font-size: 2rem;
+      padding: 12px 30px;
+      border-radius: 10px;
       text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+
+    .community-cards-area {
+      text-align: center;
+    }
+
+    .community-cards-area h2 {
+      margin: 0 0 10px 0;
+      font-size: 1.3rem;
+      color: #b7e4c7;
+      letter-spacing: 1px;
+    }
+
+    /* Dynamisk Skalering via CSS-variabel */
+    :root {
+      --card-scale: 1;
     }
 
     .cards-row {
       display: flex;
-      gap: 15px;
+      gap: calc(12px * var(--card-scale));
       justify-content: center;
-      margin-top: 15px;
-      min-height: 120px;
+      align-items: center;
+      min-height: calc(110px * var(--card-scale));
     }
 
     .card {
       background: white;
-      border-radius: 10px;
-      width: 80px;
-      height: 120px;
+      border-radius: calc(8px * var(--card-scale));
+      width: calc(75px * var(--card-scale));
+      height: calc(110px * var(--card-scale));
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: space-between;
-      padding: 8px;
+      padding: calc(6px * var(--card-scale));
       font-weight: bold;
       color: black;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
     }
     .card.red { color: #d9534f; }
-    .card-val { font-size: 1.5rem; line-height: 1; }
-    .card-suit { font-size: 2rem; line-height: 1; }
+    .card-val { font-size: calc(1.3rem * var(--card-scale)); line-height: 1; }
+    .card-suit { font-size: calc(1.8rem * var(--card-scale)); line-height: 1; }
 
     .players-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 20px;
       width: 100%;
-      max-width: 1200px;
+      max-width: 1400px;
     }
 
     .player-box {
-      background: rgba(8, 28, 21, 0.8);
+      background: rgba(8, 28, 21, 0.85);
       border: 3px solid #52b788;
-      border-radius: 15px;
+      border-radius: 16px;
       padding: 15px;
       text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .player-name {
+      font-size: 1.4rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .player-points {
+      font-size: 1rem;
+      color: #ffd700;
     }
   </style>
 </head>
 <body>
 
-  <div class="info-header">
-    <span id="game-mode">Texas Hold'em</span> | Vert: <b id="host-name">Odd Christian</b>
+  <!-- Top-kontroller for Zoom -->
+  <div class="board-header">
+    <div class="zoom-controls">
+      <span>Kortstørrelse:</span>
+      <button class="zoom-btn" onclick="adjustZoom(-0.1)">-</button>
+      <span id="zoom-level">100%</span>
+      <button class="zoom-btn" onclick="adjustZoom(0.1)">+</button>
+      <button class="reset-btn" onclick="resetZoom()">Nullstill</button>
+    </div>
   </div>
 
-  <div class="community-area">
-    <h2>FELLESKORT</h2>
-    <div id="community-cards" class="cards-row"></div>
-  </div>
+  <!-- Pokerbord Innhold -->
+  <div class="table-container">
+    
+    <div class="info-bar">
+      <span>🏠 Vert: <b id="display-host">Odd Christian</b></span>
+    </div>
 
-  <div id="players-container" class="players-grid"></div>
+    <div id="winner-banner" class="winner-banner" style="display: none;"></div>
+
+    <div class="community-cards-area">
+      <h2>FELLESKORT (BOARD)</h2>
+      <div id="community-cards" class="cards-row"></div>
+    </div>
+
+    <div id="players-container" class="players-grid"></div>
+
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let currentScale = 1.0;
+
+    function adjustZoom(delta) {
+      currentScale = Math.max(0.6, Math.min(2.0, currentScale + delta));
+      document.documentElement.style.setProperty('--card-scale', currentScale);
+      document.getElementById('zoom-level').innerText = Math.round(currentScale * 100) + '%';
+    }
+
+    function resetZoom() {
+      currentScale = 1.0;
+      document.documentElement.style.setProperty('--card-scale', currentScale);
+      document.getElementById('zoom-level').innerText = '100%';
+    }
 
     function formatCard(cardCode) {
       if (!cardCode) return '';
@@ -114,22 +233,54 @@
       `;
     }
 
+    socket.on('connect', () => {
+      socket.emit('request_game_state');
+    });
+
     socket.on('game_state', (state) => {
-      document.getElementById('game-mode').innerText = state.mode || "Texas Hold'em";
-      document.getElementById('host-name').innerText = state.host || "Odd Christian";
+      if (state.host) {
+        document.getElementById('display-host').innerText = state.host;
+      }
 
       // Felleskort
       const boardDiv = document.getElementById('community-cards');
       boardDiv.innerHTML = (state.communityCards || []).map(c => formatCard(c)).join('');
 
+      // Vinner
+      const banner = document.getElementById('winner-banner');
+      if (state.winner) {
+        banner.innerText = `🏆 WINNER: ${state.winner.name} (${state.winner.handName})`;
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+
       // Spillere
       const playersDiv = document.getElementById('players-container');
-      playersDiv.innerHTML = (state.players || []).map(p => `
-        <div class="player-box">
-          <h3 style="margin: 0 0 10px 0;">${p.name}</h3>
-          <div style="color: #ffd700;">Poeng: ${p.points || 0}</div>
-        </div>
-      `).join('');
+      if (!state.players || state.players.length === 0) {
+        playersDiv.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #aaa; font-size: 1.2rem;">Venter på at spillere skal koble seg til...</div>';
+      } else {
+        playersDiv.innerHTML = state.players.map(p => `
+          <div class="player-box">
+            <div class="player-name">${p.name}</div>
+            <div class="player-points">Poeng: ${p.points || 0}</div>
+          </div>
+        `).join('');
+      }
+    });
+
+    socket.on('players_updated', (players) => {
+      const playersDiv = document.getElementById('players-container');
+      if (!players || players.length === 0) {
+        playersDiv.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #aaa; font-size: 1.2rem;">Venter på at spillere skal koble seg til...</div>';
+      } else {
+        playersDiv.innerHTML = players.map(p => `
+          <div class="player-box">
+            <div class="player-name">${p.name}</div>
+            <div class="player-points">Poeng: ${p.points || 0}</div>
+          </div>
+        `).join('');
+      }
     });
   </script>
 </body>
