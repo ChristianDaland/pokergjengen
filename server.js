@@ -14,7 +14,7 @@ const io = new Server(server, {
 // Serve statiske filer direkte fra public-mappen
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Fallback til index.html
+// Fallback til index.html for vanlige requests
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -119,6 +119,9 @@ function updateAll() {
 
 // Socket handling
 io.on('connection', (socket) => {
+  // VIKTIG FOR MOBIL: Send nåværende tilstand med én gang mobilen kobler til
+  socket.emit('game_state_update', { gameState, players });
+
   socket.on('join_game', (data) => {
     players[socket.id] = {
       id: socket.id,
@@ -200,7 +203,6 @@ io.on('connection', (socket) => {
         const rawDescr = topWinner && topWinner.solved ? topWinner.solved.descr : 'Ukjent hånd';
         const translatedHand = translateHandDescription(rawDescr);
         
-        // Lav verdier i pokersolver.rank = bedre hånd!
         const handRank = (topWinner && topWinner.solved && topWinner.solved.rank) 
           ? Number(topWinner.solved.rank) 
           : 9999;
