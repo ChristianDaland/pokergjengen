@@ -11,7 +11,9 @@ app.use(express.static('public'));
 
 const SUITS = ['c', 'd', 'h', 's'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
-const PRESET_PLAYERS = ['Direktøren', 'Spiller 2', 'Spiller 3', 'Spiller 4', 'Spiller 5'];
+
+// De 5 faste spillerne
+const PRESET_PLAYERS = ['Einar', 'Kai', 'Ronny', 'Joakim', 'Odd Christian'];
 
 function createDeck() {
   const deck = [];

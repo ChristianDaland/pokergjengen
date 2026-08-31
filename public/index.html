@@ -34,7 +34,7 @@
       margin-bottom: 10px;
     }
 
-    .gamenight-info input {
+    .gamenight-info select, .gamenight-info input {
       background: #333;
       border: 1px solid #555;
       color: white;
@@ -107,7 +107,6 @@
       margin: 10px 0;
     }
 
-    /* KORT DESIGN FOR DEALER SKJERM (Forenklet midt-grafikk for ren plassering) */
     .card {
       display: inline-flex;
       flex-direction: column;
@@ -253,8 +252,12 @@
   <h1>Løland Gård Poker</h1>
 
   <div class="gamenight-info">
-    <span>🏠 Vert: <input type="text" id="gn-host" placeholder="F.eks. Direktøren" onchange="saveGameNightInfo()"></span>
-    <span>📍 Sted: <input type="text" id="gn-location" placeholder="F.eks. Stua / Gården" onchange="saveGameNightInfo()"></span>
+    <span>🏠 Vert: 
+      <select id="gn-host" onchange="saveGameNightInfo()">
+        <option value="">-- Velg vert --</option>
+      </select>
+    </span>
+    <span>📍 Sted: <input type="text" id="gn-location" placeholder="F.eks. Hos Kai / Gården" onchange="saveGameNightInfo()"></span>
   </div>
 
   <div id="winner-banner" class="winner-banner" style="display: none;"></div>
@@ -294,7 +297,7 @@
       <button class="btn-help" onclick="openHelpWindow()">📖 Spilleveiledning</button>
     </div>
 
-    <div class="version-tag">Versjon 2.11</div>
+    <div class="version-tag">Versjon 2.12</div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -306,6 +309,19 @@
       text: mobileUrl,
       width: 95,
       height: 95
+    });
+
+    socket.on('preset_players', (presets) => {
+      const hostSelect = document.getElementById('gn-host');
+      const currentVal = hostSelect.value;
+      hostSelect.innerHTML = '<option value="">-- Velg vert --</option>';
+      presets.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.innerText = name;
+        hostSelect.appendChild(opt);
+      });
+      if (currentVal) hostSelect.value = currentVal;
     });
 
     function saveGameNightInfo() {
