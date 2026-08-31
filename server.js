@@ -216,6 +216,29 @@ async function sendPresetPlayers(targetSocket = null) {
   }
 }
 
+// Hjelpefunksjon for å tvinge tidsvisning til norsk tid
+function formatToNorwegianTime(dateInput) {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  
+  // Tvinger formatteringen til Europe/Oslo (Norge) uavhengig av hvor serveren står
+  const options = {
+    timeZone: 'Europe/Oslo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  };
+
+  const parts = new Intl.DateTimeFormat('nb-NO', options).formatToParts(d);
+  const hash = {};
+  parts.forEach(p => hash[p.type] = p.value);
+
+  return `${hash.year}-${hash.month}-${hash.day} ${hash.hour}:${hash.minute}`;
+}
+
 io.on('connection', (socket) => {
   sendPresetPlayers(socket);
 
@@ -371,12 +394,10 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Henter Topp 10 vinnerhender sortert etter BEST HÅND (hand_rank DESC)
   socket.on('get_top10', async (data) => {
     const period = data ? data.period : 'tonight';
     let timeQuery = '';
 
-    // Bruker Europe/Oslo tidssone for å avgrense kveld, måned og år korrekt
     if (period === 'tonight') {
       timeQuery = "WHERE created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Oslo')::date AT TIME ZONE 'Europe/Oslo'";
     } else if (period === 'month') {
@@ -386,7 +407,6 @@ io.on('connection', (socket) => {
     }
 
     try {
-      // Henter ut ekte UTC ISO-streng slik at nettleseren konverterer til riktig lokal tid
       const res = await pool.query(`
         SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
         FROM hand_history 
@@ -395,21 +415,11 @@ io.on('connection', (socket) => {
         LIMIT 10
       `);
 
-      // Formaterer datoen til lokal norsk tid før den sendes til klienten
-      const formattedRows = res.rows.map(r => {
-        const d = new Date(r.rawDate);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-
-        return {
-          playerName: r.playerName,
-          handDescr: r.handDescr,
-          date: `${year}-${month}-${day} ${hours}:${minutes}`
-        };
-      });
+      const formattedRows = res.rows.map(r => ({
+        playerName: r.playerName,
+        handDescr: r.handDescr,
+        date: formatToNorwegianTime(r.rawDate)
+      }));
 
       socket.emit('top10_data', formattedRows);
     } catch (err) {
