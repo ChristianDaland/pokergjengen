@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const { Pool } = require('pg');
 const { Hand } = require('pokersolver');
@@ -8,6 +9,14 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*" }
+});
+
+// Serve statiske filer direkte fra public-mappen
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Fallback til index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const pool = new Pool({
@@ -41,14 +50,14 @@ initDB();
 // Global Spilltilstand
 let players = {};
 let gameState = {
-  phase: 'VENTING', // VENTING, PREFLOP, FLOP, TURN, RIVER, SHOWDOWN, FINISHED
+  phase: 'VENTING',
   board: [],
   deck: [],
   gameMode: 'TEXAS',
   winnerInfo: null
 };
 
-// Hjjelpefunksjoner for Stokk & Poker
+// Hjelpefunksjoner
 function createDeck() {
   const suits = ['s', 'h', 'd', 'c'];
   const values = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
@@ -61,13 +70,8 @@ function createDeck() {
   return deck.sort(() => Math.random() - 0.5);
 }
 
-function evaluatePlayerHand(playerCards, boardCards, mode) {
-  const allCards = [...playerCards, ...boardCards];
-  if (mode === 'SHORT_BUS') {
-    // Eksempel på spesialmodus om relevant
-    return Hand.solve(allCards);
-  }
-  return Hand.solve(allCards);
+function evaluatePlayerHand(playerCards, boardCards) {
+  return Hand.solve([...playerCards, ...boardCards]);
 }
 
 function translateHandDescription(descr) {
@@ -115,8 +119,6 @@ function updateAll() {
 
 // Socket handling
 io.on('connection', (socket) => {
-  console.log('Spiller koblet til:', socket.id);
-
   socket.on('join_game', (data) => {
     players[socket.id] = {
       id: socket.id,
@@ -177,7 +179,7 @@ io.on('connection', (socket) => {
       try {
         const solvedHands = activePlayers.map(p => ({
           player: p,
-          solved: evaluatePlayerHand(p.cards, gameState.board, gameState.gameMode)
+          solved: evaluatePlayerHand(p.cards, gameState.board)
         }));
 
         const handsOnly = solvedHands.map(sh => sh.solved);
@@ -198,8 +200,7 @@ io.on('connection', (socket) => {
         const rawDescr = topWinner && topWinner.solved ? topWinner.solved.descr : 'Ukjent hånd';
         const translatedHand = translateHandDescription(rawDescr);
         
-        // Pokersolver har et internt 'rank' nummer (1 er Royal Flush, 9-10 er High Card osv).
-        // Lav verdi betyr HØYERE/BEDRE hånd i pokersolver!
+        // Lav verdier i pokersolver.rank = bedre hånd!
         const handRank = (topWinner && topWinner.solved && topWinner.solved.rank) 
           ? Number(topWinner.solved.rank) 
           : 9999;
@@ -215,7 +216,7 @@ io.on('connection', (socket) => {
           [winnerText, translatedHand, handRank, gameState.gameMode || 'TEXAS']
         );
       } catch (err) {
-        console.error("Feil ved SHOWDOWN evaluation/DB insert:", err);
+        console.error("Feil ved SHOWDOWN:", err);
       }
     }
     updateAll();
@@ -233,12 +234,9 @@ io.on('connection', (socket) => {
       timeQuery = "WHERE created_at >= NOW() - INTERVAL '1 year'";
     } else if (rawPeriod === 'all' || rawPeriod === 'ever' || rawPeriod === 'evig') {
       timeQuery = "";
-    } else {
-      timeQuery = "";
     }
 
     try {
-      // ORDER BY hand_rank ASC betyr at 1 (best) kommer øverst, og 9999 nederst!
       const res = await pool.query(`
         SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
         FROM hand_history 
@@ -255,13 +253,12 @@ io.on('connection', (socket) => {
 
       socket.emit('top10_data', formattedRows);
     } catch (err) {
-      console.error("Feil ved henting av Topp 10 fra DB:", err);
+      console.error("Feil ved henting av Topp 10:", err);
       socket.emit('top10_data', []);
     }
   });
 
   socket.on('disconnect', () => {
-    console.log('Spiller koblet fra:', socket.id);
     delete players[socket.id];
     updateAll();
   });
