@@ -62,7 +62,6 @@
       min-height: 120px;
     }
 
-    /* Forenklet og tydelig kortdesign for mobil */
     .card {
       display: inline-flex;
       flex-direction: column;
@@ -83,7 +82,6 @@
       transform: scale(0.96);
     }
 
-    /* Baksiden av kortene */
     .card.back {
       background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
       border: 3px solid #ffffff;
@@ -146,6 +144,11 @@
     
     <select id="player-select" onchange="toggleCustomNameInput()">
       <option value="">-- Velg spiller --</option>
+      <option value="Einar">Einar</option>
+      <option value="Kai">Kai</option>
+      <option value="Ronny">Ronny</option>
+      <option value="Joakim">Joakim</option>
+      <option value="Odd Christian">Odd Christian</option>
       <option value="CUSTOM">+ Skriv annet navn...</option>
     </select>
 
@@ -174,11 +177,11 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    let showCards = false; // Kortene er skjult som standard
+    let showCards = false;
     let currentCards = [];
 
-    // Fallback-spillere dersom databasen/serveren tar tid på å svare
-    const fallbackPlayers = ["Direktøren", "Spiller 1", "Spiller 2", "Spiller 3", "Spiller 4"];
+    // Riktige navn fra databasen
+    const dbPlayers = ["Einar", "Kai", "Ronny", "Joakim", "Odd Christian"];
 
     function populateSelect(presets) {
       if (!Array.isArray(presets) || presets.length === 0) return;
@@ -186,12 +189,14 @@
       const select = document.getElementById('player-select');
       select.innerHTML = '<option value="">-- Velg spiller --</option>';
 
-      presets.forEach(name => {
-        const playerName = typeof name === 'string' ? name : (name.name || name.username);
-        const opt = document.createElement('option');
-        opt.value = playerName;
-        opt.innerText = playerName;
-        select.appendChild(opt);
+      presets.forEach(item => {
+        const playerName = typeof item === 'string' ? item : (item.name || item.username);
+        if (playerName) {
+          const opt = document.createElement('option');
+          opt.value = playerName;
+          opt.innerText = playerName;
+          select.appendChild(opt);
+        }
       });
 
       const customOpt = document.createElement('option');
@@ -200,28 +205,19 @@
       select.appendChild(customOpt);
     }
 
-    // Spør serveren etter registrerte spillere ved tilkobling
+    // Be serveren om oppdatert liste om det legges til flere
     socket.on('connect', () => {
       socket.emit('get_preset_players');
       socket.emit('get_registered_players');
     });
 
-    // Motta spillere fra serveren
     socket.on('preset_players', (presets) => populateSelect(presets));
     socket.on('registered_players_list', (presets) => populateSelect(presets));
 
-    // Ekstra sjekk mot API + sikkerhetsnett dersom ingenting blir mottatt
     fetch('/api/players')
       .then(res => res.json())
       .then(data => populateSelect(data))
-      .catch(() => {
-        setTimeout(() => {
-          const select = document.getElementById('player-select');
-          if (select.options.length <= 2) {
-            populateSelect(fallbackPlayers);
-          }
-        }, 1000);
-      });
+      .catch(() => {});
 
     function toggleCustomNameInput() {
       const select = document.getElementById('player-select');
@@ -268,7 +264,6 @@
       renderCards();
     }
 
-    // Tallverdi for sortering (A er høyest)
     const VALUE_MAP = {
       '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
       'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
@@ -352,7 +347,6 @@
 
       const newSortedCards = sortPlayerCards(data.cards || []);
       
-      // Tilbakestill til skjult når det deles ut helt nye kort
       if (JSON.stringify(newSortedCards) !== JSON.stringify(currentCards)) {
         currentCards = newSortedCards;
         showCards = false;
