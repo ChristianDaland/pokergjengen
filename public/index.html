@@ -104,7 +104,7 @@
 
     .menu-item:hover { background: #2d6a4f; }
 
-    select.menu-input, input.menu-input {
+    select.menu-input {
       width: 100%;
       padding: 10px;
       background: #1b4332;
@@ -190,6 +190,7 @@
       gap: 8px;
       justify-content: center;
       margin: 10px 0;
+      min-height: 75px;
     }
 
     .card {
@@ -213,13 +214,14 @@
 
     .players-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 15px;
       width: 100%;
+      margin-top: 15px;
     }
 
     .player-box {
-      background: rgba(0, 0, 0, 0.4);
+      background: rgba(0, 0, 0, 0.5);
       border: 2px solid #52b788;
       border-radius: 10px;
       padding: 10px;
@@ -281,19 +283,16 @@
       <button class="menu-item" onclick="toggleGameMode()">🔄 Bytt Spilltype (Omaha / Texas)</button>
     </div>
 
-    <!-- Vert & Sted -->
+    <!-- Vert -->
     <div class="menu-section">
       <label>Vert (Huset):</label>
-      <select id="host-select" class="menu-input" onchange="updateHostAndLocation()">
+      <select id="host-select" class="menu-input" onchange="updateHost()">
         <option value="Odd Christian">Odd Christian</option>
         <option value="Einar">Einar</option>
         <option value="Kai">Kai</option>
         <option value="Ronny">Ronny</option>
         <option value="Joakim">Joakim</option>
       </select>
-
-      <label>Spillested:</label>
-      <input type="text" id="location-input" class="menu-input" value="Fjøset, Hos Kai / Gården" onchange="updateHostAndLocation()">
     </div>
 
     <!-- Nullstilling -->
@@ -307,10 +306,9 @@
     
     <!-- Pokerbord -->
     <div class="table-area">
-      <!-- Vert og Sted Info -->
+      <!-- Vert Info -->
       <div class="info-bar">
         <span>🏠 Vert: <b id="display-host">Odd Christian</b></span>
-        <span>📍 Sted: <b id="display-location">Fjøset, Hos Kai / Gården</b></span>
       </div>
 
       <div id="winner-banner" class="winner-banner" style="display: none;"></div>
@@ -370,14 +368,10 @@
       document.getElementById('backdrop').classList.toggle('show');
     }
 
-    function updateHostAndLocation() {
+    function updateHost() {
       const host = document.getElementById('host-select').value;
-      const location = document.getElementById('location-input').value;
-      
       document.getElementById('display-host').innerText = host;
-      document.getElementById('display-location').innerText = location;
-
-      socket.emit('update_info', { host, location });
+      socket.emit('update_info', { host });
     }
 
     function formatCard(cardCode) {
@@ -403,13 +397,38 @@
       `;
     }
 
+    function renderPlayers(players) {
+      const playersDiv = document.getElementById('players-container');
+      if (!players || players.length === 0) {
+        playersDiv.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #aaa;">Ingen spillere har koblet seg til ennå</div>';
+        return;
+      }
+
+      playersDiv.innerHTML = players.map(p => `
+        <div class="player-box">
+          <div style="font-weight: bold; font-size: 1.1rem;">${p.name}</div>
+          <div style="font-size: 0.85rem; color: #ffd700;">Poeng: ${p.points || 0}</div>
+          <div class="cards-row">
+            ${(p.cards || []).map(c => formatCard(c)).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    socket.on('connect', () => {
+      socket.emit('request_game_state');
+    });
+
+    socket.on('players_updated', (players) => {
+      renderPlayers(players);
+    });
+
     socket.on('game_state', (state) => {
       // Oppdater status
-      document.getElementById('game-status-title').innerText = `Modus: ${state.mode} | Fase: ${state.phase}`;
+      document.getElementById('game-status-title').innerText = `Modus: ${state.mode || 'Texas Hold\'em'} | Fase: ${state.phase || 'VENTING'}`;
 
-      // Vert og sted
+      // Vert
       if (state.host) document.getElementById('display-host').innerText = state.host;
-      if (state.location) document.getElementById('display-location').innerText = state.location;
 
       // Felleskort
       const boardDiv = document.getElementById('community-cards');
@@ -425,16 +444,7 @@
       }
 
       // Spillere
-      const playersDiv = document.getElementById('players-container');
-      playersDiv.innerHTML = (state.players || []).map(p => `
-        <div class="player-box">
-          <div style="font-weight: bold;">${p.name}</div>
-          <div style="font-size: 0.85rem; color: #ffd700;">Poeng: ${p.points}</div>
-          <div class="cards-row">
-            ${(p.cards || []).map(c => formatCard(c)).join('')}
-          </div>
-        </div>
-      `).join('');
+      renderPlayers(state.players);
     });
 
     function nextRound() {
