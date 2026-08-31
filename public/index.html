@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Løland Gård Poker</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Importer Socket.IO klientbibliotek -->
+  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
@@ -35,11 +37,6 @@
           <option value="Einar">Einar</option>
           <option value="Kai">Kai</option>
         </select>
-      </div>
-
-      <div class="control-group">
-        <label for="locationInput">📍 Sted:</label>
-        <input type="text" id="locationInput" placeholder="F.eks. Hos Kai / Gården">
       </div>
     </div>
   </header>
@@ -88,7 +85,7 @@
   </div>
 
   <!-- ==========================================
-       JAVASCRIPT CARD RENDER MODULE & SYNC
+       JAVASCRIPT CARD RENDER MODULE & SOCKET SYNC
        ========================================== -->
   <script>
     // 1. Hamburgermeny toggle
@@ -140,14 +137,14 @@
       `;
     }
 
-    // 3. Render-funksjon som kalles når spilltilstand oppdateres fra serveren/Firebase
+    // 3. Render-funksjon som oppdaterer hele bordet
     function renderGameData(state) {
       if (!state) return;
 
       // Oppdater status/vinner
       const winnerBanner = document.getElementById('winnerText');
-      if (winnerBanner && state.winnerText) {
-        winnerBanner.textContent = state.winnerText;
+      if (winnerBanner) {
+        winnerBanner.textContent = state.winnerText || (state.players && state.players.length > 0 ? 'Spillere tilkoblet' : 'Venter på spillere...');
       }
 
       // Oppdater Modus & Fase
@@ -158,37 +155,53 @@
 
       // Render Felleskort
       const communityContainer = document.getElementById('communityCardsContainer');
-      if (communityContainer && Array.isArray(state.communityCards)) {
-        communityContainer.innerHTML = state.communityCards
-          .map(card => createCardHTML(card))
-          .join('');
+      if (communityContainer) {
+        const cards = Array.isArray(state.communityCards) ? state.communityCards : [];
+        communityContainer.innerHTML = cards.map(card => createCardHTML(card)).join('');
       }
 
-      // Render Spillere
+      // Render Spillere når de logger inn på mobilen
       const playersContainer = document.getElementById('playersGridContainer');
-      if (playersContainer && Array.isArray(state.players)) {
-        playersContainer.innerHTML = state.players.map(player => {
-          const cardsHTML = (player.cards || []).map(card => createCardHTML(card)).join('');
-          return `
-            <div class="player-box">
-              <div class="player-info">
-                <div class="player-name">${player.name || 'Ukjent'}</div>
-                <div class="player-meta">Plass ${player.place || '-'} | Poeng: ${player.points || 0}</div>
-                ${player.role ? `<span class="player-badge">${player.role}</span>` : ''}
-                <div class="player-meta" style="color: #4caf50; font-weight: bold; margin-top: 4px;">
-                  🟢 ${player.status || 'AKTIV'}
+      if (playersContainer) {
+        const players = Array.isArray(state.players) ? state.players : [];
+        if (players.length === 0) {
+          playersContainer.innerHTML = '<div style="color: #ccc; font-style: italic;">Ingen spillere har koblet seg til ennå</div>';
+        } else {
+          playersContainer.innerHTML = players.map(player => {
+            const cardsHTML = (player.cards || []).map(card => createCardHTML(card)).join('');
+            return `
+              <div class="player-box">
+                <div class="player-info">
+                  <div class="player-name">${player.name || 'Ukjent'}</div>
+                  <div class="player-meta">Plass ${player.place || '-'} | Poeng: ${player.points || 0}</div>
+                  ${player.role ? `<span class="player-badge">${player.role}</span>` : ''}
+                  <div class="player-meta" style="color: #4caf50; font-weight: bold; margin-top: 4px;">
+                    🟢 ${player.status || 'TILKOBLET'}
+                  </div>
+                </div>
+                <div class="player-cards-container">
+                  ${cardsHTML}
                 </div>
               </div>
-              <div class="player-cards-container">
-                ${cardsHTML}
-              </div>
-            </div>
-          `;
-        }).join('');
+            `;
+          }).join('');
+        }
       }
     }
 
-    // Global eksponering slik at hovedappen din (socket.js / firebase.js) kan kalle denne
+    // 4. Koble til server via Socket.IO for live-oppdateringer fra mobil
+    const socket = io();
+
+    // Lütt etter spilltilstand fra serveren
+    socket.on('gameState', (state) => {
+      renderGameData(state);
+    });
+
+    socket.on('playersUpdated', (players) => {
+      renderGameData({ players: players });
+    });
+
+    // Global eksponering
     window.updatePokerBoard = renderGameData;
   </script>
 </body>
