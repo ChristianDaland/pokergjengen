@@ -102,19 +102,23 @@ let gameState = {
 };
 
 let players = {};
-const disconnectTimeouts = {};
 
-function addPlayerByName(name) {
+function addOrUpdatePlayer(name, socketId = null) {
   const cleanName = name ? name.trim() : 'Spiller';
   let existingKey = Object.keys(players).find(
     k => players[k].name.toLowerCase() === cleanName.toLowerCase()
   );
 
-  if (!existingKey) {
+  if (existingKey) {
+    if (socketId) players[existingKey].socketId = socketId;
+    players[existingKey].connected = true;
+    return existingKey;
+  } else {
     const seatNumber = Object.keys(players).length + 1;
-    const fakeId = 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
-    players[fakeId] = {
-      id: fakeId,
+    const id = socketId || ('p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
+    players[id] = {
+      id: id,
+      socketId: socketId,
       name: cleanName,
       seat: seatNumber,
       cards: [],
@@ -122,6 +126,7 @@ function addPlayerByName(name) {
       role: '',
       connected: true
     };
+    return id;
   }
 }
 
@@ -176,16 +181,15 @@ function startNewHandLogic() {
 
 io.on('connection', (socket) => {
 
-  // Støtte for mobil-event "playerJoined"
   socket.on('playerJoined', (data) => {
     if (data && data.playerName) {
-      addPlayerByName(data.playerName);
+      addOrUpdatePlayer(data.playerName, socket.id);
       updateAll();
     }
   });
 
   socket.on('join_game', (name) => {
-    addPlayerByName(name);
+    addOrUpdatePlayer(name, socket.id);
     updateAll();
   });
 
@@ -278,7 +282,14 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
-  // Send initial-tilstand ved tilkobling
+  socket.on('disconnect', () => {
+    const playerKey = Object.keys(players).find(k => players[k].socketId === socket.id);
+    if (playerKey) {
+      players[playerKey].connected = false;
+      updateAll();
+    }
+  });
+
   socket.emit('state_update', buildStatePayload());
 });
 
@@ -307,7 +318,20 @@ function buildStatePayload() {
 }
 
 function updateAll() {
+  // Broadcast generell status til alle
   io.emit('state_update', buildStatePayload());
+
+  // Send de private kortene spesifikt til hver enkelt spiller sin mobil-socket
+  Object.values(players).forEach(p => {
+    if (p.socketId) {
+      io.to(p.socketId).emit('your_cards', {
+        cards: p.cards || [],
+        role: p.role || '',
+        gameMode: gameState.gameMode,
+        phase: gameState.phase
+      });
+    }
+  });
 }
 
 const PORT = process.env.PORT || 3000;
