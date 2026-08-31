@@ -89,6 +89,71 @@
   </div>
 
   <!-- ==========================================
+       MODAL 1: TOPP 10-LISTER
+       ========================================== -->
+  <div class="modal-overlay" id="top10Modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📊 Flernivå Topp 10 (Showdown)</h2>
+        <button class="modal-close" onclick="closeModal('top10Modal')">&times;</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTop10Tab('tonight')">Kveldens</button>
+        <button class="tab-btn" onclick="switchTop10Tab('month')">Månedens</button>
+        <button class="tab-btn" onclick="switchTop10Tab('year')">Årets</button>
+        <button class="tab-btn" onclick="switchTop10Tab('alltime')">Evig (All-Time)</button>
+      </div>
+      <div id="top10Content">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Spiller</th>
+              <th>Hånd</th>
+              <th>Dato</th>
+            </tr>
+          </thead>
+          <tbody id="top10TableBody">
+            <tr><td colspan="4" style="text-align: center; color: #94a3b8;">Laster rangeringer...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL 2: BRUKERVEILEDNING
+       ========================================== -->
+  <div class="modal-overlay" id="guideModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📖 Brukerveiledning</h2>
+        <button class="modal-close" onclick="closeModal('guideModal')">&times;</button>
+      </div>
+      <div class="guide-section">
+        <h3>1. Oppstart & Spillere</h3>
+        <ul>
+          <li><strong>QR-kode:</strong> Spillere skanner QR-koden på skjermen for å koble til via sin mobil.</li>
+          <li><strong>Gjenkjenning:</strong> Mobilen husker profilvalget slik at re-tilkobling skjer automatisk.</li>
+        </ul>
+
+        <h3>2. Dealer-Dashboard (Storskjerm)</h3>
+        <ul>
+          <li><strong>Velg Modus:</strong> Bruk knappene i bunnfeltet for å veksle mellom Texas Hold'em og Omaha.</li>
+          <li><strong>Start Ny Hånd:</strong> Genererer ny kortstokk, stokker, flytter dealer-knappen og deler ut private kort til mobilene.</li>
+          <li><strong>Ny Runde / Neste Fase:</strong> Flytter spillet gjennom Preflop, Flop, Turn, River og Showdown.</li>
+        </ul>
+
+        <h3>3. Showdown & Diplom</h3>
+        <ul>
+          <li>Ved <strong>Showdown</strong> evalueres alle hender automatisk, og vinneren tildeles poeng på storskjermen.</li>
+          <li>Sjeldne hender (Fire like eller bedre) utløser automatisk diplom og feiring!</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
        JAVASCRIPT CARD RENDER MODULE & SOCKET SYNC
        ========================================== -->
   <script>
@@ -104,7 +169,79 @@
       });
     }
 
-    // 2. Oversettelse av kort fra backend (f.eks "Th" -> Value: "10", Suit: "h")
+    // 2. Modal Styring
+    function openModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.add('active');
+        if (navMenu) navMenu.classList.remove('open');
+      }
+    }
+
+    function closeModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) {
+        modal.classList.remove('active');
+      }
+    }
+
+    // Lukk modal ved klikk utenfor modal-innholdet
+    window.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-overlay')) {
+        e.target.classList.remove('active');
+      }
+    });
+
+    // Lukk modal på Escape-tasten
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+      }
+    });
+
+    // Menyknapper knyttet til modalene
+    document.getElementById('menuTop10')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      openModal('top10Modal');
+      socket.emit('get_top10', { period: 'tonight' });
+    });
+
+    document.getElementById('menuGuide')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      openModal('guideModal');
+    });
+
+    // Bytte fane i Topp 10 Modal
+    function switchTop10Tab(period) {
+      const tabs = document.querySelectorAll('.modal-tabs .tab-btn');
+      tabs.forEach(tab => tab.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.getElementById('top10TableBody').innerHTML = '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Henter data...</td></tr>';
+      socket.emit('get_top10', { period: period });
+    }
+
+    // Mottak av Topp 10-data fra backend
+    socket.on('top10_data', (data) => {
+      const tbody = document.getElementById('top10TableBody');
+      if (!tbody) return;
+
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Ingen hender registrert i denne perioden enda.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map((item, index) => `
+        <tr>
+          <td><strong>${index + 1}</strong></td>
+          <td>${item.playerName || 'Ukjent'}</td>
+          <td>${item.handDescr || '-'}</td>
+          <td>${item.date || '-'}</td>
+        </tr>
+      `).join('');
+    });
+
+    // 3. Oversettelse av kort fra backend (f.eks "Th" -> Value: "10", Suit: "h")
     function parseCardString(cardStr) {
       if (!cardStr || typeof cardStr !== 'string' || cardStr.length < 2) return null;
       let val = cardStr.charAt(0);
@@ -155,7 +292,7 @@
       `;
     }
 
-    // 3. Render hele bordet når 'state_update' mottas fra serveren
+    // 4. Render hele bordet når 'state_update' mottas fra serveren
     socket.on('state_update', (data) => {
       if (!data) return;
 
@@ -218,7 +355,7 @@
       }
     });
 
-    // 4. Knappehandlinger knyttet til backend-socket-events
+    // 5. Knappehandlinger knyttet til backend-socket-events
     document.getElementById('hostSelect')?.addEventListener('change', (e) => {
       socket.emit('set_gamenight', { host: e.target.value });
     });
