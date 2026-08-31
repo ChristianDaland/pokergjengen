@@ -1,347 +1,52 @@
-<!DOCTYPE html>
-<html lang="no">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spillerskjerm - Løland Gård Poker</title>
-  <style>
-    * { box-sizing: border-box; }
+// mobile.html (i script-taggen)
 
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: white;
-      text-align: center;
-      margin: 0;
-      padding: 15px;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
+socket.on('game_state_update', (data) => {
+  const { gameState, players } = data;
+  
+  // Finn denne enhetens spiller data fra listen/objektet
+  const myPlayer = Array.isArray(players) 
+    ? players.find(p => p.id === socket.id)
+    : players[socket.id];
 
-    h2 { margin-top: 5px; font-size: 1.4rem; }
+  if (!myPlayer) return;
 
-    .card-selection {
-      background: #1e1e1e;
-      padding: 15px;
-      border-radius: 12px;
-      margin-bottom: 15px;
-    }
+  // Bygg et spiller-objekt som mobile.html forventer i 'player_state'
+  const playerStateData = {
+    role: myPlayer.role || '',
+    points: myPlayer.points || 0,
+    cards: myPlayer.cards || [],
+    folded: myPlayer.folded,
+    phase: gameState ? gameState.phase : 'VENTING'
+  };
 
-    select, input {
-      width: 100%;
-      padding: 12px;
-      margin: 8px 0;
-      border-radius: 8px;
-      border: 1px solid #444;
-      background: #2a2a2a;
-      color: white;
-      font-size: 1rem;
-    }
+  const roleDiv = document.getElementById('player-role');
+  if (playerStateData.role) {
+    let badgeClass = playerStateData.role === 'Dealer' ? 'role-dealer' : 'role-blind';
+    roleDiv.innerHTML = `<span class="status-badge ${badgeClass}">${playerStateData.role}</span>`;
+  } else {
+    roleDiv.innerHTML = '';
+  }
 
-    .btn {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 5px;
-    }
+  const pointsDiv = document.getElementById('player-points');
+  pointsDiv.innerText = `Poeng: ${playerStateData.points}`;
 
-    .btn-join { background-color: #2196f3; color: white; }
-    .btn-fold { background-color: #f44336; color: white; margin-top: 15px; }
+  const newSortedCards = sortPlayerCards(playerStateData.cards);
+  
+  if (JSON.stringify(newSortedCards) !== JSON.stringify(currentCards)) {
+    currentCards = newSortedCards;
+    showCards = false;
+  }
 
-    .cards-container {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin: 20px 0;
-      cursor: pointer;
-      min-height: 120px;
-    }
+  renderCards();
 
-    /* Forenklet og tydelig kortdesign for mobil */
-    .card {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #ffffff;
-      border-radius: 10px;
-      width: 78px;
-      height: 115px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-      font-weight: bold;
-      padding: 6px;
-      user-select: none;
-      transition: transform 0.15s ease-in-out;
-    }
+  const foldBtn = document.getElementById('fold-container');
+  const foldedMsg = document.getElementById('folded-msg');
 
-    .card:active {
-      transform: scale(0.96);
-    }
-
-    /* Baksiden av kortene */
-    .card.back {
-      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-      border: 3px solid #ffffff;
-      color: transparent;
-      position: relative;
-    }
-    
-    .card.back::after {
-      content: '♠♥♦♣';
-      font-size: 0.9rem;
-      color: rgba(255, 255, 255, 0.3);
-      letter-spacing: 2px;
-    }
-
-    .card.red { color: #d9534f; }
-    .card.black { color: #222222; }
-
-    .card-val {
-      font-size: 1.8rem;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-
-    .card-suit {
-      font-size: 2.2rem;
-      line-height: 1;
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.9rem;
-      font-weight: bold;
-      margin-bottom: 10px;
-    }
-    .role-dealer { background-color: #ff9800; color: white; }
-    .role-blind { background-color: #9c27b0; color: white; }
-
-    .folded-overlay {
-      color: #f44336;
-      font-weight: bold;
-      font-size: 1.2rem;
-      margin-top: 10px;
-    }
-
-    .tap-hint {
-      font-size: 0.85rem;
-      color: #aaa;
-      margin-top: -10px;
-      margin-bottom: 15px;
-    }
-  </style>
-</head>
-<body>
-
-  <div id="login-screen" class="card-selection">
-    <h2>Velkommen til Pokerbordet</h2>
-    <p style="font-size: 0.9rem; color: #aaa;">Velg ditt navn eller skriv inn nytt:</p>
-    
-    <select id="player-select" onchange="toggleCustomNameInput()">
-      <option value="">-- Velg spiller --</option>
-      <option value="CUSTOM">+ Skriv annet navn...</option>
-    </select>
-
-    <input type="text" id="custom-name" placeholder="Skriv navnet ditt her..." style="display: none;">
-
-    <button class="btn btn-join" onclick="joinGame()">Koble til</button>
-  </div>
-
-  <div id="game-screen" style="display: none; flex: 1;">
-    <h3 id="player-title" style="margin-bottom: 5px;"></h3>
-    <div id="player-role"></div>
-    <div id="player-points" style="font-size: 0.9rem; color: #ffd700; margin-bottom: 10px;"></div>
-
-    <div id="my-cards" class="cards-container" onclick="toggleCardVisibility()"></div>
-    <div id="tap-hint" class="tap-hint" style="display: none;">Trykk på kortene for å vise/skjule</div>
-
-    <div id="fold-container">
-      <button class="btn btn-fold" onclick="fold()">Kast kortene (Fold)</button>
-    </div>
-
-    <div id="folded-msg" class="folded-overlay" style="display: none;">
-      Du har kastet deg denne runden.
-    </div>
-  </div>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    let showCards = false; // Kortene er skjult som standard
-    let currentCards = [];
-
-    socket.on('preset_players', (presets) => {
-      const select = document.getElementById('player-select');
-      select.innerHTML = '<option value="">-- Velg spiller --</option>';
-
-      presets.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.innerText = name;
-        select.appendChild(opt);
-      });
-
-      const customOpt = document.createElement('option');
-      customOpt.value = 'CUSTOM';
-      customOpt.innerText = '+ Skriv annet navn...';
-      select.appendChild(customOpt);
-    });
-
-    function toggleCustomNameInput() {
-      const select = document.getElementById('player-select');
-      const customInput = document.getElementById('custom-name');
-      
-      if (select.value === 'CUSTOM') {
-        customInput.style.display = 'block';
-        customInput.focus();
-      } else {
-        customInput.style.display = 'none';
-      }
-    }
-
-    function joinGame() {
-      const select = document.getElementById('player-select');
-      const customInput = document.getElementById('custom-name');
-      let playerName = '';
-
-      if (select.value === 'CUSTOM') {
-        playerName = customInput.value.trim();
-      } else {
-        playerName = select.value;
-      }
-
-      if (!playerName) {
-        alert('Vennligst velg eller skriv inn et navn');
-        return;
-      }
-
-      socket.emit('join_game', playerName);
-
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('game-screen').style.display = 'block';
-      document.getElementById('player-title').innerText = playerName;
-    }
-
-    function fold() {
-      socket.emit('player_fold');
-    }
-
-    function toggleCardVisibility() {
-      if (!currentCards || currentCards.length === 0) return;
-      showCards = !showCards;
-      renderCards();
-    }
-
-    // Tallverdi for sortering (A er høyest)
-    const VALUE_MAP = {
-      '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-      'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
-    };
-
-    function sortPlayerCards(cards) {
-      if (!cards || cards.length === 0) return [];
-
-      const counts = {};
-      cards.forEach(c => {
-        const val = c.slice(0, -1).toUpperCase();
-        counts[val] = (counts[val] || 0) + 1;
-      });
-
-      return [...cards].sort((a, b) => {
-        const valA = a.slice(0, -1).toUpperCase();
-        const valB = b.slice(0, -1).toUpperCase();
-        const suitA = a.slice(-1).toLowerCase();
-        const suitB = b.slice(-1).toLowerCase();
-
-        const countA = counts[valA];
-        const countB = counts[valB];
-
-        if (countA !== countB) return countB - countA;
-        if (VALUE_MAP[valA] !== VALUE_MAP[valB]) return VALUE_MAP[valB] - VALUE_MAP[valA];
-        return suitA.localeCompare(suitB);
-      });
-    }
-
-    function formatCard(cardCode) {
-      if (!showCards) {
-        return `<div class="card back"></div>`;
-      }
-
-      if (!cardCode) return '';
-      let rawVal = cardCode.slice(0, -1).toUpperCase();
-      let displayVal = rawVal === 'T' ? '10' : rawVal;
-      const suitChar = cardCode.slice(-1).toLowerCase();
-      
-      const suits = {
-        'h': { symbol: '♥', color: 'red' },
-        'd': { symbol: '♦', color: 'red' },
-        'c': { symbol: '♣', color: 'black' },
-        's': { symbol: '♠', color: 'black' }
-      };
-      
-      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
-
-      return `
-        <div class="card ${suit.color}">
-          <div class="card-val">${displayVal}</div>
-          <div class="card-suit">${suit.symbol}</div>
-        </div>
-      `;
-    }
-
-    function renderCards() {
-      const cardsDiv = document.getElementById('my-cards');
-      const tapHint = document.getElementById('tap-hint');
-      
-      if (currentCards && currentCards.length > 0) {
-        cardsDiv.innerHTML = currentCards.map(c => formatCard(c)).join('');
-        tapHint.style.display = 'block';
-      } else {
-        cardsDiv.innerHTML = '';
-        tapHint.style.display = 'none';
-      }
-    }
-
-    socket.on('player_state', (data) => {
-      const roleDiv = document.getElementById('player-role');
-      if (data.role) {
-        let badgeClass = data.role === 'Dealer' ? 'role-dealer' : 'role-blind';
-        roleDiv.innerHTML = `<span class="status-badge ${badgeClass}">${data.role}</span>`;
-      } else {
-        roleDiv.innerHTML = '';
-      }
-
-      const pointsDiv = document.getElementById('player-points');
-      pointsDiv.innerText = `Poeng: ${data.points || 0}`;
-
-      const newSortedCards = sortPlayerCards(data.cards || []);
-      
-      // Tilbakestill til skjult når det deles ut helt nye kort
-      if (JSON.stringify(newSortedCards) !== JSON.stringify(currentCards)) {
-        currentCards = newSortedCards;
-        showCards = false;
-      }
-
-      renderCards();
-
-      const foldBtn = document.getElementById('fold-container');
-      const foldedMsg = document.getElementById('folded-msg');
-
-      if (data.folded) {
-        foldBtn.style.display = 'none';
-        foldedMsg.style.display = 'block';
-      } else {
-        foldBtn.style.display = data.phase !== 'VENTING' && data.phase !== 'SHOWDOWN' ? 'block' : 'none';
-        foldedMsg.style.display = 'none';
-      }
-    });
-  </script>
-</body>
-</html>
+  if (playerStateData.folded) {
+    foldBtn.style.display = 'none';
+    foldedMsg.style.display = 'block';
+  } else {
+    foldBtn.style.display = (playerStateData.phase !== 'VENTING' && playerStateData.phase !== 'SHOWDOWN') ? 'block' : 'none';
+    foldedMsg.style.display = 'none';
+  }
+});
