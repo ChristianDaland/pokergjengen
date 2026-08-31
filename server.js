@@ -186,7 +186,6 @@ function startNewHandLogic() {
   gameState.dealerIndex = (gameState.dealerIndex + 1) % playerList.length;
 
   playerList.forEach((p, idx) => {
-    // Hvis spilleren er slått ut fra omgangen, deles det ikke ut kort
     p.folded = p.isEliminated || false;
     p.cards = [];
     
@@ -210,12 +209,26 @@ function startNewHandLogic() {
   });
 }
 
-// Tilbakestiller alle utslåtte spillere ved ny omgang
 function resetEliminations() {
   Object.values(players).forEach(p => {
     p.isEliminated = false;
     p.eliminationRank = null;
   });
+}
+
+async function sendPresetPlayers(targetSocket = null) {
+  try {
+    const res = await pool.query('SELECT name FROM players ORDER BY id ASC');
+    const playerNames = res.rows.map(r => r.name);
+    if (targetSocket) {
+      targetSocket.emit('preset_players', playerNames);
+    } else {
+      io.emit('preset_players', playerNames);
+    }
+  } catch (err) {
+    console.error("Feil ved henting av spillere:", err);
+    if (targetSocket) targetSocket.emit('preset_players', DEFAULT_PLAYERS);
+  }
 }
 
 function formatToNorwegianTime(dateInput) {
@@ -233,19 +246,19 @@ function formatToNorwegianTime(dateInput) {
 }
 
 io.on('connection', (socket) => {
-  // Bytte status for utslått spiller
+  // VIKTIG: Sender liste over forhåndsdefinerte spillere til klienten med en gang koblende skjer
+  sendPresetPlayers(socket);
+
   socket.on('toggle_player_eliminated', (targetPlayerId) => {
     const player = players[targetPlayerId];
     if (!player) return;
 
     if (!player.isEliminated) {
-      // Merk som utslått: Finn laveste ledige plassering
       const activeCount = Object.values(players).filter(p => !p.isEliminated).length;
       player.isEliminated = true;
-      player.eliminationRank = activeCount; // eks. 5. plass om 5 var aktive
+      player.eliminationRank = activeCount;
       player.folded = true;
     } else {
-      // Tilbakestill til aktiv (feilretting)
       player.isEliminated = false;
       player.eliminationRank = null;
       player.folded = false;
@@ -254,7 +267,6 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
-  // Start helt ny omgang (tilbakestiller brytere til grønn)
   socket.on('start_new_round', () => {
     resetEliminations();
     startNewHandLogic();
@@ -292,6 +304,12 @@ io.on('connection', (socket) => {
         points: 0
       };
     }
+    updateAll();
+  });
+
+  socket.on('set_gamenight', (data) => {
+    gameState.gameNight.host = data.host || '';
+    gameState.gameNight.location = data.location || '';
     updateAll();
   });
 
@@ -389,15 +407,113 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
+  socket.on('player_fold', () => {
+    if (players[socket.id]) {
+      players[socket.id].folded = true;
+      const activePlayers = Object.values(players).filter(p => !p.folded && !p.isEliminated);
+      if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
+        gameState.phase = 'FINISHED';
+        gameState.winnerInfo = {
+          winnerName: activePlayers[0].name,
+          descr: 'Alle andre kastet seg',
+          foldedWin: true
+        };
+        activePlayers[0].points = (activePlayers[0].points || 0) + 1;
+      }
+      updateAll();
+    }
+  });
+
+  socket.on('get_top10', async (data) => {
+    const rawPeriod = (data && data.period) ? String(data.period).toLowerCase() : 'tonight';
+    let timeQuery = '';
+
+    if (rawPeriod === 'tonight' || rawPeriod === 'kveld' || rawPeriod === 'kveldens') {
+      timeQuery = "WHERE created_at >= NOW() - INTERVAL '24 hours'";
+    } else if (rawPeriod === 'month' || rawPeriod === 'måned' || rawPeriod === 'månedens') {
+      timeQuery = "WHERE created_at >= NOW() - INTERVAL '30 days'";
+    } else if (rawPeriod === 'year' || rawPeriod === 'år' || rawPeriod === 'årets') {
+      timeQuery = "WHERE created_at >= NOW() - INTERVAL '1 year'";
+    } else if (rawPeriod === 'all' || rawPeriod === 'ever' || rawPeriod === 'evig') {
+      timeQuery = "";
+    } else {
+      timeQuery = "";
+    }
+
+    try {
+      const res = await pool.query(`
+        SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
+        FROM hand_history 
+        ${timeQuery}
+        ORDER BY hand_score DESC, id DESC 
+        LIMIT 10
+      `);
+
+      const formattedRows = res.rows.map(r => ({
+        playerName: r.playerName,
+        handDescr: r.handDescr,
+        date: formatToNorwegianTime(r.rawDate)
+      }));
+
+      socket.emit('top10_data', formattedRows);
+    } catch (err) {
+      console.error("Feil ved henting av Topp 10 fra DB:", err);
+      socket.emit('top10_data', []);
+    }
+  });
+
+  socket.on('admin_get_players', async () => {
+    try {
+      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
+      socket.emit('admin_players_list', res.rows);
+    } catch (err) {
+      console.error("Feil ved henting av admin spillere:", err);
+    }
+  });
+
+  socket.on('admin_add_player', async (name) => {
+    if (!name || !name.trim()) return;
+    try {
+      await pool.query('INSERT INTO players (name) VALUES ($1) ON CONFLICT DO NOTHING', [name.trim()]);
+      sendPresetPlayers();
+      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
+      socket.emit('admin_players_list', res.rows);
+    } catch (err) {
+      console.error("Feil ved ny spiller:", err);
+    }
+  });
+
+  socket.on('admin_delete_player', async (id) => {
+    try {
+      await pool.query('DELETE FROM players WHERE id = $1', [id]);
+      sendPresetPlayers();
+      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
+      socket.emit('admin_players_list', res.rows);
+    } catch (err) {
+      console.error("Feil ved sletting av spiller:", err);
+    }
+  });
+
+  socket.on('admin_clear_history', async () => {
+    try {
+      await pool.query('DELETE FROM hand_history');
+      socket.emit('admin_action_success', 'Håndhistorikk / Topp 10 har blitt tømt!');
+    } catch (err) {
+      console.error("Feil ved tømming av historikk:", err);
+    }
+  });
+
   socket.on('disconnect', () => {
     if (players[socket.id]) {
       players[socket.id].connected = false;
       const disconnectedId = socket.id;
+
       disconnectTimeouts[disconnectedId] = setTimeout(() => {
         delete players[disconnectedId];
         delete disconnectTimeouts[disconnectedId];
         updateAll();
       }, 45000);
+
       updateAll();
     }
   });
@@ -425,6 +541,19 @@ function updateAll() {
       points: p.points || 0,
       cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
+  });
+
+  playerList.forEach(p => {
+    if (p.connected) {
+      io.to(p.id).emit('player_state', {
+        phase: gameState.phase,
+        cards: p.cards,
+        role: p.role,
+        folded: p.folded,
+        winnerInfo: gameState.winnerInfo,
+        points: p.points || 0
+      });
+    }
   });
 }
 
