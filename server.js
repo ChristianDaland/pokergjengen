@@ -1,4 +1,30 @@
 // server.js
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+
+// Initialiser Socket.io med CORS-støtte
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Server statiske filer (index.html, mobile.html, etc.)
+app.use(express.static(__dirname));
+
+// Global tilstand for spillet
+let players = {};
+let gameState = {
+  phase: 'VENTING', // VENTING, PRE-FLOP, FLOP, TURN, RIVER, SHOWDOWN
+  pot: 0,
+  communityCards: [],
+  currentTurn: null
+};
 
 // Hjælp til å sende oppdatert tilstand i et format frontend forventer
 function updateAll() {
@@ -23,12 +49,41 @@ io.on('connection', (socket) => {
     players[socket.id] = {
       id: socket.id,
       name: name,
-      points: 0,
+      points: 1000,
       cards: [],
       folded: false,
       isEliminated: false,
       connected: true
     };
+    updateAll();
+  });
+
+  // Start nytt spill / runde
+  socket.on('start_game', () => {
+    gameState.phase = 'PRE-FLOP';
+    gameState.pot = 0;
+    gameState.communityCards = [];
+
+    // Tilbakestill spillere for ny runde
+    Object.keys(players).forEach((id) => {
+      players[id].folded = false;
+      players[id].cards = [];
+    });
+
+    updateAll();
+  });
+
+  // Håndter neste fase
+  socket.on('next_phase', (nextPhase) => {
+    if (nextPhase) {
+      gameState.phase = nextPhase;
+    } else {
+      const phases = ['VENTING', 'PRE-FLOP', 'FLOP', 'TURN', 'RIVER', 'SHOWDOWN'];
+      const currentIndex = phases.indexOf(gameState.phase);
+      if (currentIndex < phases.length - 1) {
+        gameState.phase = phases[currentIndex + 1];
+      }
+    }
     updateAll();
   });
 
@@ -40,10 +95,15 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Håndter at en spiller kobler fra
   socket.on('disconnect', () => {
     delete players[socket.id];
     updateAll();
   });
-  
-  // ... resten av server.js (next_phase, start_game osv.)
+});
+
+// Start serveren på angitt port (Render setter process.env.PORT automatisk)
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server kjører på port ${PORT}`);
 });
