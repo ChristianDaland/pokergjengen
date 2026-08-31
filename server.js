@@ -426,12 +426,15 @@ io.on('connection', (socket) => {
     const period = data ? data.period : 'tonight';
     let timeQuery = '';
 
+    // Robust filtrering basert på periode
     if (period === 'tonight') {
-      timeQuery = "WHERE created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Oslo')::date AT TIME ZONE 'Europe/Oslo'";
+      timeQuery = "WHERE created_at >= NOW() - INTERVAL '24 hours'";
     } else if (period === 'month') {
-      timeQuery = "WHERE created_at >= date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Oslo') AT TIME ZONE 'Europe/Oslo'";
+      timeQuery = "WHERE created_at >= NOW() - INTERVAL '30 days'";
     } else if (period === 'year') {
-      timeQuery = "WHERE created_at >= date_trunc('year', CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Oslo') AT TIME ZONE 'Europe/Oslo'";
+      timeQuery = "WHERE created_at >= NOW() - INTERVAL '1 year'";
+    } else if (period === 'all' || period === 'ever') {
+      timeQuery = ""; // Ingen tidsfiltrering for Evig (All-Time)
     }
 
     try {
