@@ -61,7 +61,8 @@
     <div class="sidebar">
       <div class="qr-box">
         <p><strong>Skann for å bli med:</strong></p>
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pokergjengen.onrender.com" alt="QR Code">
+        <!-- QR-kode peker nå direkte til mobile.html -->
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pokergjengen.onrender.com/mobile.html" alt="QR Code til mobilvisning">
       </div>
 
       <button class="btn btn-orange">💻 Åpne Bordvisning</button>
@@ -163,13 +164,13 @@
     };
 
     function renderBoard() {
-      // 1. Render Felleskort (bruker den nye rent hjørne-malen)
+      // 1. Render Felleskort
       const communityContainer = document.getElementById('communityCardsContainer');
       communityContainer.innerHTML = gameState.communityCards
         .map(card => createCardHTML(card))
         .join('');
 
-      // 2. Render Spillere og deres kort (bruker samme hjørne-mal)
+      // 2. Render Spillere og deres kort
       const playersContainer = document.getElementById('playersGridContainer');
       playersContainer.innerHTML = gameState.players.map(player => {
         const playerBadgeClass = player.role === 'Lilleblind' ? 'badge-sb' : 'badge-bb';
