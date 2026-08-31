@@ -1,52 +1,142 @@
-// mobile.html (i script-taggen)
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poker Spillkontroll</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1a1a1a;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .card-container {
+      margin: 20px 0;
+      font-size: 1.2rem;
+    }
+    .btn {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 1.2rem;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      max-width: 300px;
+    }
+    .status-badge {
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .role-dealer { background-color: #f39c12; }
+    .role-blind { background-color: #2980b9; }
+  </style>
+</head>
+<body>
 
-socket.on('game_state_update', (data) => {
-  const { gameState, players } = data;
+  <h1>Poker Gjengen</h1>
+  <div id="player-role"></div>
+  <div id="player-points">Poeng: 0</div>
   
-  // Finn denne enhetens spiller data fra listen/objektet
-  const myPlayer = Array.isArray(players) 
-    ? players.find(p => p.id === socket.id)
-    : players[socket.id];
+  <div class="card-container" id="cards-display">
+    Venter på kort...
+  </div>
 
-  if (!myPlayer) return;
+  <div id="fold-container" style="display: none;">
+    <button class="btn" onclick="foldHand()">Kast kort (Fold)</button>
+  </div>
 
-  // Bygg et spiller-objekt som mobile.html forventer i 'player_state'
-  const playerStateData = {
-    role: myPlayer.role || '',
-    points: myPlayer.points || 0,
-    cards: myPlayer.cards || [],
-    folded: myPlayer.folded,
-    phase: gameState ? gameState.phase : 'VENTING'
-  };
+  <div id="folded-msg" style="display: none; color: #888;">
+    Du har kastet kortene denne runden.
+  </div>
 
-  const roleDiv = document.getElementById('player-role');
-  if (playerStateData.role) {
-    let badgeClass = playerStateData.role === 'Dealer' ? 'role-dealer' : 'role-blind';
-    roleDiv.innerHTML = `<span class="status-badge ${badgeClass}">${playerStateData.role}</span>`;
-  } else {
-    roleDiv.innerHTML = '';
-  }
+  <script>
+    const socket = io();
+    let currentCards = [];
+    let showCards = false;
 
-  const pointsDiv = document.getElementById('player-points');
-  pointsDiv.innerText = `Poeng: ${playerStateData.points}`;
+    // Hent spillernavn fra prompt eller URL
+    const playerName = prompt("Skriv inn navnet ditt:") || "Anonym";
+    socket.emit('join_game', playerName);
 
-  const newSortedCards = sortPlayerCards(playerStateData.cards);
-  
-  if (JSON.stringify(newSortedCards) !== JSON.stringify(currentCards)) {
-    currentCards = newSortedCards;
-    showCards = false;
-  }
+    function sortPlayerCards(cards) {
+      return cards || [];
+    }
 
-  renderCards();
+    function renderCards() {
+      const display = document.getElementById('cards-display');
+      if (currentCards.length === 0) {
+        display.innerText = "Ingen kort utdelt.";
+      } else {
+        display.innerText = "Dine kort: " + currentCards.join(', ');
+      }
+    }
 
-  const foldBtn = document.getElementById('fold-container');
-  const foldedMsg = document.getElementById('folded-msg');
+    function foldHand() {
+      socket.emit('player_fold');
+    }
 
-  if (playerStateData.folded) {
-    foldBtn.style.display = 'none';
-    foldedMsg.style.display = 'block';
-  } else {
-    foldBtn.style.display = (playerStateData.phase !== 'VENTING' && playerStateData.phase !== 'SHOWDOWN') ? 'block' : 'none';
-    foldedMsg.style.display = 'none';
-  }
-});
+    // Lytt på spilloppdateringer fra serveren
+    socket.on('game_state_update', (data) => {
+      const { gameState, players } = data;
+      
+      const myPlayer = Array.isArray(players) 
+        ? players.find(p => p.id === socket.id)
+        : players[socket.id];
+
+      if (!myPlayer) return;
+
+      const playerStateData = {
+        role: myPlayer.role || '',
+        points: myPlayer.points || 0,
+        cards: myPlayer.cards || [],
+        folded: myPlayer.folded,
+        phase: gameState ? gameState.phase : 'VENTING'
+      };
+
+      const roleDiv = document.getElementById('player-role');
+      if (playerStateData.role) {
+        let badgeClass = playerStateData.role === 'Dealer' ? 'role-dealer' : 'role-blind';
+        roleDiv.innerHTML = `<span class="status-badge ${badgeClass}">${playerStateData.role}</span>`;
+      } else {
+        roleDiv.innerHTML = '';
+      }
+
+      const pointsDiv = document.getElementById('player-points');
+      pointsDiv.innerText = `Poeng: ${playerStateData.points}`;
+
+      const newSortedCards = sortPlayerCards(playerStateData.cards);
+      
+      if (JSON.stringify(newSortedCards) !== JSON.stringify(currentCards)) {
+        currentCards = newSortedCards;
+        showCards = false;
+      }
+
+      renderCards();
+
+      const foldBtn = document.getElementById('fold-container');
+      const foldedMsg = document.getElementById('folded-msg');
+
+      if (playerStateData.folded) {
+        foldBtn.style.display = 'none';
+        foldedMsg.style.display = 'block';
+      } else {
+        foldBtn.style.display = (playerStateData.phase !== 'VENTING' && playerStateData.phase !== 'SHOWDOWN') ? 'block' : 'none';
+        foldedMsg.style.display = 'none';
+      }
+    });
+  </script>
+
+</body>
+</html>
