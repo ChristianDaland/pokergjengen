@@ -2,10 +2,37 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const Hand = require('pokersolver').Hand;
+const { Pool } = require('pg');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// --- POSTGRESQL DATABASE KOBLING ---
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
+
+// Oppretter tabellen 'hand_history' dersom den ikke eksisterer
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hand_history (
+        id SERIAL PRIMARY KEY,
+        player VARCHAR(100),
+        hand VARCHAR(100),
+        game_mode VARCHAR(20),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log("Database-tabell 'hand_history' er klar!");
+  } catch (err) {
+    console.error("Feil ved opprettelse av databasetabell:", err);
+  }
+}
+initDB();
+// -----------------------------------
 
 app.use(express.static('public'));
 
@@ -214,7 +241,7 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
-  socket.on('next_phase', () => {
+  socket.on('next_phase', async () => {
     const activePlayers = Object.values(players).filter(p => !p.folded);
 
     if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
@@ -269,12 +296,24 @@ io.on('connection', (socket) => {
       }
 
       const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
+      const translatedHand = translateHandDescription(rawDescr);
 
       gameState.winnerInfo = {
         winnerName: winnerText,
-        descr: translateHandDescription(rawDescr),
+        descr: translatedHand,
         foldedWin: false
       };
+
+      // --- LAGRE VINNERHÅND TIL DATABASE ---
+      try {
+        await pool.query(
+          'INSERT INTO hand_history (player, hand, game_mode) VALUES ($1, $2, $3)',
+          [winnerText, translatedHand, gameState.gameMode]
+        );
+      } catch (dbErr) {
+        console.error("Feil ved lagring av vinnerhånd til DB:", dbErr);
+      }
+      // -------------------------------------
     }
     updateAll();
   });
@@ -293,6 +332,34 @@ io.on('connection', (socket) => {
         activePlayers[0].points = (activePlayers[0].points || 0) + 1;
       }
       updateAll();
+    }
+  });
+
+  // Henter Topp 10 vinnerhender direkte fra PostgreSQL databasen
+  socket.on('get_top10', async (data) => {
+    const period = data ? data.period : 'tonight';
+    let timeQuery = '';
+
+    if (period === 'tonight') {
+      timeQuery = "WHERE created_at >= CURRENT_DATE";
+    } else if (period === 'month') {
+      timeQuery = "WHERE created_at >= date_trunc('month', CURRENT_DATE)";
+    } else if (period === 'year') {
+      timeQuery = "WHERE created_at >= date_trunc('year', CURRENT_DATE)";
+    }
+
+    try {
+      const res = await pool.query(`
+        SELECT player AS "playerName", hand AS "handDescr", TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI') AS date 
+        FROM hand_history 
+        ${timeQuery}
+        ORDER BY id DESC 
+        LIMIT 10
+      `);
+      socket.emit('top10_data', res.rows);
+    } catch (err) {
+      console.error("Feil ved henting av Topp 10 fra DB:", err);
+      socket.emit('top10_data', []);
     }
   });
 
