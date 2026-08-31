@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Løland Gård Poker - Mobil & Kontroll</title>
+  <title>Løland Poker - Mobil</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     body {
@@ -17,77 +17,6 @@
       align-items: center;
       min-height: 100vh;
       box-sizing: border-box;
-      position: relative;
-    }
-
-    /* Topplinje med direkteknapp og hamburgermeny */
-    .top-bar {
-      width: 100%;
-      max-width: 400px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-      position: relative;
-    }
-
-    .open-board-btn {
-      background: #059669;
-      color: white;
-      text-decoration: none;
-      font-weight: bold;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    }
-
-    .open-board-btn:hover {
-      background: #10b981;
-    }
-
-    .hamburger-btn {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: white;
-      font-size: 1.2rem;
-      padding: 6px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    .dropdown-menu {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: 45px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      width: 220px;
-      z-index: 100;
-      overflow: hidden;
-    }
-
-    .dropdown-menu.show {
-      display: block;
-    }
-
-    .dropdown-menu a {
-      display: block;
-      padding: 12px 16px;
-      color: #f8fafc;
-      text-decoration: none;
-      font-size: 0.95rem;
-      border-bottom: 1px solid #334155;
-    }
-
-    .dropdown-menu a:hover {
-      background: #334155;
     }
 
     .card-box {
@@ -99,9 +28,10 @@
       max-width: 400px;
       text-align: center;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      margin-top: 20px;
     }
 
-    input, select, button {
+    select, button {
       width: 100%;
       padding: 12px;
       margin-top: 10px;
@@ -154,26 +84,22 @@
       font-size: 0.85rem;
       margin-bottom: 10px;
     }
+
+    .switch-link {
+      color: #64748b;
+      font-size: 0.8rem;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      padding: 0;
+      margin-top: 15px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
-  <!-- Topplinje med direkteknapp til Bordskjermen -->
-  <div class="top-bar">
-    <a href="/board" target="_blank" class="open-board-btn">
-      🖥️ Åpne Bordskjerm
-    </a>
-
-    <div style="position: relative;">
-      <button class="hamburger-btn" onclick="toggleMenu()">☰ Meny</button>
-      <div class="dropdown-menu" id="dropdown-menu">
-        <a href="/board" target="_blank">🖥️ Åpne Bordskjerm (Ny fane)</a>
-        <a href="#" onclick="changeUser()">👤 Bytt Spiller</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Innloggingsseksjon -->
+  <!-- Innlogging -->
   <div class="card-box" id="login-section">
     <h2 style="color: #ffd700; margin-top: 0;">♠️ Bli med på spillet ♥️</h2>
     <label style="color: #cbd5e1; display: block; text-align: left;">Velg navnet ditt:</label>
@@ -187,7 +113,7 @@
     <button class="action-btn" onclick="joinGame()">Koble til bordet</button>
   </div>
 
-  <!-- Spillerområde -->
+  <!-- Dine Kort -->
   <div class="card-box" id="game-section" style="display: none;">
     <div id="role-badge-container"></div>
     <h3 style="margin: 0; color: #94a3b8;">Dine kort:</h3>
@@ -196,6 +122,8 @@
     <div id="my-cards" class="cards-container">
       <p style="color: #64748b; font-style: italic;">Venter på at dealeren skal dele ut kort...</p>
     </div>
+
+    <button class="switch-link" onclick="changeUser()">Bytt bruker</button>
   </div>
 
   <script>
@@ -204,10 +132,6 @@
 
     if (myName) {
       autoJoin(myName);
-    }
-
-    function toggleMenu() {
-      document.getElementById('dropdown-menu').classList.toggle('show');
     }
 
     function changeUser() {

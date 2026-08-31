@@ -2,8 +2,8 @@
 <html lang="no">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Løland Gård Poker - Hovedpanel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Løland Poker - Hovedpanel</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     body {
@@ -11,7 +11,7 @@
       color: #f8fafc;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
-      padding: 15px;
+      padding: 30px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -19,254 +19,68 @@
       box-sizing: border-box;
     }
 
-    /* Topplinje med snarvei til storskjerm og meny */
-    .top-bar {
+    .container {
       width: 100%;
-      max-width: 400px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-      position: relative;
+      max-width: 600px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      text-align: center;
     }
 
-    .open-board-btn {
+    h1 {
+      color: #ffd700;
+      margin-top: 0;
+    }
+
+    .launch-btn {
+      display: inline-block;
+      width: 100%;
       background: #059669;
       color: white;
       text-decoration: none;
       font-weight: bold;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      font-size: 1.2rem;
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 25px;
+      box-sizing: border-box;
+      transition: background 0.2s;
     }
 
-    .open-board-btn:hover {
+    .launch-btn:hover {
       background: #10b981;
     }
 
-    .hamburger-btn {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: white;
-      font-size: 1.2rem;
-      padding: 6px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    .dropdown-menu {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: 45px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      width: 220px;
-      z-index: 100;
-      overflow: hidden;
-    }
-
-    .dropdown-menu.show {
-      display: block;
-    }
-
-    .dropdown-menu a {
-      display: block;
-      padding: 12px 16px;
-      color: #f8fafc;
-      text-decoration: none;
-      font-size: 0.95rem;
-      border-bottom: 1px solid #334155;
-    }
-
-    .dropdown-menu a:hover {
-      background: #334155;
-    }
-
-    .card-box {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 20px;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    }
-
-    input, select, button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      border-radius: 8px;
-      border: 1px solid #475569;
+    .info-box {
       background: #0f172a;
-      color: white;
-      font-size: 1rem;
-      box-sizing: border-box;
-    }
-
-    .action-btn {
-      background: #2563eb;
-      font-weight: bold;
-      border: none;
-      cursor: pointer;
-      margin-top: 15px;
-    }
-
-    .cards-container {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 20px;
-      flex-wrap: wrap;
-    }
-
-    .playing-card {
-      background: #ffffff;
-      color: #0f172a;
-      width: 65px;
-      height: 95px;
+      border: 1px solid #334155;
       border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 6px;
-      font-weight: bold;
-      border: 1px solid #cbd5e1;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-    }
-
-    .badge {
-      display: inline-block;
-      background: #ffd700;
-      color: #0f172a;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-weight: bold;
-      font-size: 0.85rem;
-      margin-bottom: 10px;
+      padding: 15px;
+      margin-top: 15px;
+      text-align: left;
+      color: #94a3b8;
     }
   </style>
 </head>
 <body>
 
-  <!-- Topplinje med snarvei til Bordskjerm -->
-  <div class="top-bar">
-    <a href="/board" target="_blank" class="open-board-btn">
-      🖥️ Åpne Bordskjerm
+  <div class="container">
+    <h1>♠️ Løland Poker Control ♥️</h1>
+    <p>Velkommen til kontrollpanelet på PC.</p>
+
+    <!-- Hovedknapp for å starte TV/Bordskjermen -->
+    <a href="/board" target="_blank" class="launch-btn">
+      🖥️ Åpne Bordskjerm (TV / Projektor)
     </a>
 
-    <div style="position: relative;">
-      <button class="hamburger-btn" onclick="toggleMenu()">☰ Meny</button>
-      <div class="dropdown-menu" id="dropdown-menu">
-        <a href="/board" target="_blank">🖥️ Åpne Bordskjerm (Ny fane)</a>
-        <a href="#" onclick="changeUser()">👤 Bytt Spiller</a>
-      </div>
+    <div class="info-box">
+      <h3 style="margin-top:0; color:#f8fafc;">📱 Spillere på mobil:</h3>
+      <p>Spillerne skanner QR-koden på bordskjermen for å komme direkte til sin mobilvisning.</p>
     </div>
   </div>
 
-  <!-- Innloggingsseksjon -->
-  <div class="card-box" id="login-section">
-    <h2 style="color: #ffd700; margin-top: 0;">♠️ Løland Poker ♥️</h2>
-    <label style="color: #cbd5e1; display: block; text-align: left;">Velg din bruker:</label>
-    <select id="player-select">
-      <option value="Odd Christian">Odd Christian</option>
-      <option value="Kai">Kai</option>
-      <option value="Ronny">Ronny</option>
-      <option value="Einar">Einar</option>
-      <option value="Joakim">Joakim</option>
-    </select>
-    <button class="action-btn" onclick="joinGame()">Koble til bordet</button>
-  </div>
-
-  <!-- Spillerområde -->
-  <div class="card-box" id="game-section" style="display: none;">
-    <div id="role-badge-container"></div>
-    <h3 style="margin: 0; color: #94a3b8;">Dine kort:</h3>
-    <h1 id="player-display-name" style="margin: 5px 0 15px 0; color: #38bdf8;"></h1>
-
-    <div id="my-cards" class="cards-container">
-      <p style="color: #64748b; font-style: italic;">Venter på at dealeren skal dele ut kort...</p>
-    </div>
-  </div>
-
-  <script>
-    const socket = io();
-    let myName = localStorage.getItem('poker_player_name') || '';
-
-    if (myName) {
-      autoJoin(myName);
-    }
-
-    function toggleMenu() {
-      document.getElementById('dropdown-menu').classList.toggle('show');
-    }
-
-    function changeUser() {
-      localStorage.removeItem('poker_player_name');
-      location.reload();
-    }
-
-    function joinGame() {
-      const selected = document.getElementById('player-select').value;
-      localStorage.setItem('poker_player_name', selected);
-      autoJoin(selected);
-    }
-
-    function autoJoin(name) {
-      myName = name;
-      document.getElementById('login-section').style.display = 'none';
-      document.getElementById('game-section').style.display = 'block';
-      document.getElementById('player-display-name').innerText = name;
-
-      socket.emit('playerJoined', { playerName: name });
-    }
-
-    socket.on('your_cards', (data) => {
-      const container = document.getElementById('my-cards');
-      const badgeContainer = document.getElementById('role-badge-container');
-
-      if (data.role) {
-        badgeContainer.innerHTML = `<span class="badge">${data.role}</span>`;
-      } else {
-        badgeContainer.innerHTML = '';
-      }
-
-      if (data.cards && data.cards.length > 0) {
-        container.innerHTML = data.cards.map(card => formatCardHTML(card)).join('');
-      } else {
-        container.innerHTML = `<p style="color: #64748b; font-style: italic;">Venter på at dealeren skal dele ut kort...</p>`;
-      }
-    });
-
-    function formatCardHTML(cardString) {
-      if (!cardString || cardString.length < 2) return '';
-      
-      const value = cardString.slice(0, -1).replace('T', '10');
-      const suit = cardString.slice(-1).toLowerCase();
-
-      let symbol = suit;
-      let color = 'white';
-
-      if (suit === 's') { symbol = '♠'; color = '#0f172a'; }
-      if (suit === 'h') { symbol = '♥'; color = '#ef4444'; }
-      if (suit === 'd') { symbol = '♦'; color = '#38bdf8'; }
-      if (suit === 'c') { symbol = '♣'; color = '#22c55e'; }
-
-      return `
-        <div class="playing-card">
-          <div style="text-align: left; font-size: 1.1rem; color: ${color};">${value}</div>
-          <div style="text-align: center; font-size: 1.6rem; color: ${color};">${symbol}</div>
-        </div>
-      `;
-    }
-  </script>
 </body>
 </html>
