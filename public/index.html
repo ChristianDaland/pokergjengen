@@ -18,7 +18,7 @@
       <h1>Løland Gård Poker</h1>
     </div>
 
-    <!-- Dropdown meny (Fasebasert UI/UX - Skjult Hjørnemeny) -->
+    <!-- Dropdown meny -->
     <nav class="nav-menu" id="navMenu">
       <ul>
         <li><a href="#" id="menuTop10">📊 Topp 10-lister</a></li>
@@ -57,7 +57,7 @@
     <div class="poker-table">
       
       <div class="table-header-info" id="gameModeText">
-        Modus: OMAHA | Fase: VENTING
+        MODUS: IKKE VALGT | FASE: VENTING
       </div>
 
       <!-- Felleskort -->
@@ -185,21 +185,18 @@
       }
     }
 
-    // Lukk modal ved klikk utenfor modal-innholdet
     window.addEventListener('click', (e) => {
       if (e.target.classList.contains('modal-overlay')) {
         e.target.classList.remove('active');
       }
     });
 
-    // Lukk modal på Escape-tasten
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
       }
     });
 
-    // Menyknapper knyttet til modalene
     document.getElementById('menuTop10')?.addEventListener('click', (e) => {
       e.preventDefault();
       openModal('top10Modal');
@@ -211,7 +208,6 @@
       openModal('guideModal');
     });
 
-    // Bytte fane i Topp 10 Modal
     function switchTop10Tab(period) {
       const tabs = document.querySelectorAll('.modal-tabs .tab-btn');
       tabs.forEach(tab => tab.classList.remove('active'));
@@ -221,7 +217,6 @@
       socket.emit('get_top10', { period: period });
     }
 
-    // Mottak av Topp 10-data fra backend
     socket.on('top10_data', (data) => {
       const tbody = document.getElementById('top10TableBody');
       if (!tbody) return;
@@ -241,7 +236,7 @@
       `).join('');
     });
 
-    // 3. Oversettelse av kort fra backend (f.eks "Th" -> Value: "10", Suit: "h")
+    // 3. Oversettelse av kort fra backend
     function parseCardString(cardStr) {
       if (!cardStr || typeof cardStr !== 'string' || cardStr.length < 2) return null;
       let val = cardStr.charAt(0);
@@ -269,7 +264,6 @@
       return 'clubs';
     }
 
-    // Hjørnedesign for kortene
     function createCardHTML(cardStr) {
       const parsed = parseCardString(cardStr);
       if (!parsed) return `<div class="card card-back"></div>`;
@@ -292,11 +286,10 @@
       `;
     }
 
-    // 4. Render hele bordet når 'state_update' mottas fra serveren
+    // 4. Render bordet
     socket.on('state_update', (data) => {
       if (!data) return;
 
-      // Top banner (Vinner / status)
       const winnerBanner = document.getElementById('winnerText');
       if (winnerBanner) {
         if (data.winnerInfo) {
@@ -308,22 +301,19 @@
         }
       }
 
-      // Modus og Fase
       const modeText = document.getElementById('gameModeText');
       if (modeText) {
-        const mode = data.gameMode || 'IKKE VALGT';
+        const mode = data.gameMode || data.mode || 'IKKE VALGT';
         const phase = data.phase || 'VENTING';
-        modeText.textContent = `Modus: ${mode} | Fase: ${phase}`;
+        modeText.textContent = `MODUS: ${mode.toUpperCase()} | FASE: ${phase.toUpperCase()}`;
       }
 
-      // Felleskort (board)
       const communityContainer = document.getElementById('communityCardsContainer');
       if (communityContainer) {
         const boardCards = Array.isArray(data.board) ? data.board : [];
         communityContainer.innerHTML = boardCards.map(card => createCardHTML(card)).join('');
       }
 
-      // Spillere (players)
       const playersContainer = document.getElementById('playersGridContainer');
       if (playersContainer) {
         const players = Array.isArray(data.players) ? data.players : [];
@@ -331,15 +321,15 @@
         if (players.length === 0) {
           playersContainer.innerHTML = '<div style="color: #ccc; font-style: italic;">Ingen spillere tilkoblet</div>';
         } else {
-          playersContainer.innerHTML = players.map(player => {
-            const statusText = player.connected ? (player.folded ? '🔴 KASTET' : '🟢 INNE') : '⚪ FRAKOBLET';
+          playersContainer.innerHTML = players.map((player, idx) => {
+            const statusText = player.connected !== false ? (player.folded ? '🔴 KASTET' : '🟢 INNE') : '⚪ FRAKOBLET';
             const cardsHTML = (player.cards || []).map(card => createCardHTML(card)).join('');
 
             return `
               <div class="player-box ${player.folded ? 'player-folded' : ''}">
                 <div class="player-info">
                   <div class="player-name">${player.name || 'Ukjent'}</div>
-                  <div class="player-meta">Plass ${player.seat || '-'} | Poeng: ${player.points || 0}</div>
+                  <div class="player-meta">Plass ${player.seat || idx + 1} | Poeng: ${player.points || 1000}</div>
                   ${player.role ? `<span class="player-badge">${player.role}</span>` : ''}
                   <div class="player-meta" style="font-weight: bold; margin-top: 4px;">
                     ${statusText}
@@ -355,25 +345,33 @@
       }
     });
 
-    // 5. Knappehandlinger knyttet til backend-socket-events
+    // 5. Knappehandlinger - sender flere varianter for kompatibilitet med backend
     document.getElementById('hostSelect')?.addEventListener('change', (e) => {
       socket.emit('set_gamenight', { host: e.target.value });
+      socket.emit('set_host', e.target.value);
     });
 
     document.getElementById('btnTexas')?.addEventListener('click', () => {
       socket.emit('set_game_mode', 'TEXAS');
+      socket.emit('set_mode', 'TEXAS');
+      socket.emit('select_mode', 'TEXAS');
     });
 
     document.getElementById('btnOmaha')?.addEventListener('click', () => {
       socket.emit('set_game_mode', 'OMAHA');
+      socket.emit('set_mode', 'OMAHA');
+      socket.emit('select_mode', 'OMAHA');
     });
 
     document.getElementById('btnStartHand')?.addEventListener('click', () => {
       socket.emit('start_new_hand');
+      socket.emit('start_hand');
+      socket.emit('deal_cards');
     });
 
     document.getElementById('btnNextRound')?.addEventListener('click', () => {
       socket.emit('next_phase');
+      socket.emit('next_round');
     });
   </script>
 </body>
