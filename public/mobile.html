@@ -177,14 +177,20 @@
     let showCards = false; // Kortene er skjult som standard
     let currentCards = [];
 
-    socket.on('preset_players', (presets) => {
+    // Fallback-spillere dersom databasen/serveren tar tid på å svare
+    const fallbackPlayers = ["Direktøren", "Spiller 1", "Spiller 2", "Spiller 3", "Spiller 4"];
+
+    function populateSelect(presets) {
+      if (!Array.isArray(presets) || presets.length === 0) return;
+
       const select = document.getElementById('player-select');
       select.innerHTML = '<option value="">-- Velg spiller --</option>';
 
       presets.forEach(name => {
+        const playerName = typeof name === 'string' ? name : (name.name || name.username);
         const opt = document.createElement('option');
-        opt.value = name;
-        opt.innerText = name;
+        opt.value = playerName;
+        opt.innerText = playerName;
         select.appendChild(opt);
       });
 
@@ -192,7 +198,30 @@
       customOpt.value = 'CUSTOM';
       customOpt.innerText = '+ Skriv annet navn...';
       select.appendChild(customOpt);
+    }
+
+    // Spør serveren etter registrerte spillere ved tilkobling
+    socket.on('connect', () => {
+      socket.emit('get_preset_players');
+      socket.emit('get_registered_players');
     });
+
+    // Motta spillere fra serveren
+    socket.on('preset_players', (presets) => populateSelect(presets));
+    socket.on('registered_players_list', (presets) => populateSelect(presets));
+
+    // Ekstra sjekk mot API + sikkerhetsnett dersom ingenting blir mottatt
+    fetch('/api/players')
+      .then(res => res.json())
+      .then(data => populateSelect(data))
+      .catch(() => {
+        setTimeout(() => {
+          const select = document.getElementById('player-select');
+          if (select.options.length <= 2) {
+            populateSelect(fallbackPlayers);
+          }
+        }, 1000);
+      });
 
     function toggleCustomNameInput() {
       const select = document.getElementById('player-select');
