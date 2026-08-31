@@ -1,90 +1,4 @@
-<!DOCTYPE html>
-<html lang="no">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Løland Gård Poker</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- Importer Socket.IO klientbibliotek -->
-  <script src="/socket.io/socket.io.js"></script>
-</head>
-<body>
-
-  <!-- Header med Hamburgermeny -->
-  <header>
-    <div class="header-content">
-      <button class="hamburger-btn" id="hamburgerBtn" aria-label="Meny">
-        ☰
-      </button>
-      <h1>Løland Gård Poker</h1>
-    </div>
-
-    <!-- Dropdown meny -->
-    <nav class="nav-menu" id="navMenu">
-      <ul>
-        <li><a href="#" id="menuNewGame">Start Ny Spillekveld</a></li>
-        <li><a href="board.html" target="_blank">Åpne Bordvisning</a></li>
-        <li><a href="mobile.html" target="_blank">Åpne Mobilvisning</a></li>
-      </ul>
-    </nav>
-    
-    <!-- Top Controls -->
-    <div class="top-controls">
-      <div class="control-group">
-        <label for="hostSelect">🏡 Vert:</label>
-        <select id="hostSelect">
-          <option value="Odd Christian" selected>Odd Christian</option>
-          <option value="Einar">Einar</option>
-          <option value="Kai">Kai</option>
-        </select>
-      </div>
-    </div>
-  </header>
-
-  <!-- Winner Banner -->
-  <div class="status-banner" id="winnerText">
-    Venter på spillere...
-  </div>
-
-  <!-- Main Content Layout -->
-  <div class="table-container">
-    
-    <!-- Poker Table Felt -->
-    <div class="poker-table">
-      
-      <div class="table-header-info" id="gameModeText">
-        Modus: OMAHA | Fase: VENTING
-      </div>
-
-      <!-- Felleskort på bordet -->
-      <div class="community-cards" id="communityCardsContainer"></div>
-
-      <!-- Spillere på bordet -->
-      <div class="players-grid" id="playersGridContainer"></div>
-
-    </div>
-
-    <!-- Sidebar Right -->
-    <div class="sidebar">
-      <div class="qr-box">
-        <p><strong>Skann for å bli med:</strong></p>
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pokergjengen.onrender.com/mobile.html" alt="QR Code til mobilvisning">
-      </div>
-
-      <a href="board.html" target="_blank" class="btn btn-orange" style="text-decoration: none;">💻 Åpne Bordvisning</a>
-      <button class="btn btn-blue" id="btnNextRound">Ny Runde</button>
-    </div>
-
-  </div>
-
-  <!-- Bottom Control Bar -->
-  <div class="bottom-bar">
-    <button class="btn-small" id="btnGameType">Spilltype</button>
-    <button class="btn-small" id="btnStartHand">Start Ny Hånd</button>
-    <button class="btn-small" id="btnGuide">📖 Spilleveiledning</button>
-  </div>
-
-  <!-- ==========================================
+<!-- ==========================================
        JAVASCRIPT CARD RENDER MODULE & SOCKET SYNC
        ========================================== -->
   <script>
@@ -98,7 +12,16 @@
       });
     }
 
-    // 2. Kortrendering (Rent hjørnedesign for index.html)
+    // 2. Global state-beholder for å bevare data mellom delvise oppdateringer
+    let currentGameState = {
+      communityCards: [],
+      players: [],
+      mode: 'OMAHA',
+      phase: 'VENTING',
+      winnerText: ''
+    };
+
+    // 3. Kortrendering (Rent hjørnedesign for index.html)
     function getSuitSymbol(suit) {
       const s = String(suit || '').toLowerCase();
       if (s.includes('heart') || s === 'h' || s === '♥') return '♥';
@@ -137,42 +60,48 @@
       `;
     }
 
-    // 3. Render-funksjon som oppdaterer hele bordet
-    function renderGameData(state) {
-      if (!state) return;
+    // 4. Tegn hele bordet basert på `currentGameState`
+    function drawBoard() {
+      const state = currentGameState;
 
-      // Oppdater status/vinner
+      // Banner
       const winnerBanner = document.getElementById('winnerText');
       if (winnerBanner) {
-        winnerBanner.textContent = state.winnerText || (state.players && state.players.length > 0 ? 'Spillere tilkoblet' : 'Venter på spillere...');
+        if (state.winnerText) {
+          winnerBanner.textContent = state.winnerText;
+        } else {
+          winnerBanner.textContent = (state.players && state.players.length > 0)
+            ? `Tilkoblede spillere: ${state.players.length}`
+            : 'Venter på spillere...';
+        }
       }
 
-      // Oppdater Modus & Fase
+      // Modus / Fase
       const modeText = document.getElementById('gameModeText');
       if (modeText) {
         modeText.textContent = `Modus: ${state.mode || 'OMAHA'} | Fase: ${state.phase || 'VENTING'}`;
       }
 
-      // Render Felleskort
+      // Felleskort
       const communityContainer = document.getElementById('communityCardsContainer');
       if (communityContainer) {
         const cards = Array.isArray(state.communityCards) ? state.communityCards : [];
         communityContainer.innerHTML = cards.map(card => createCardHTML(card)).join('');
       }
 
-      // Render Spillere når de logger inn på mobilen
+      // Spillere
       const playersContainer = document.getElementById('playersGridContainer');
       if (playersContainer) {
         const players = Array.isArray(state.players) ? state.players : [];
         if (players.length === 0) {
-          playersContainer.innerHTML = '<div style="color: #ccc; font-style: italic;">Ingen spillere har koblet seg til ennå</div>';
+          playersContainer.innerHTML = '<div style="color: #ccc; font-style: italic;">Ingen spillere tilkoblet</div>';
         } else {
           playersContainer.innerHTML = players.map(player => {
             const cardsHTML = (player.cards || []).map(card => createCardHTML(card)).join('');
             return `
               <div class="player-box">
                 <div class="player-info">
-                  <div class="player-name">${player.name || 'Ukjent'}</div>
+                  <div class="player-name">${player.name || player.username || 'Ukjent'}</div>
                   <div class="player-meta">Plass ${player.place || '-'} | Poeng: ${player.points || 0}</div>
                   ${player.role ? `<span class="player-badge">${player.role}</span>` : ''}
                   <div class="player-meta" style="color: #4caf50; font-weight: bold; margin-top: 4px;">
@@ -189,20 +118,32 @@
       }
     }
 
-    // 4. Koble til server via Socket.IO for live-oppdateringer fra mobil
+    // 5. Oppdater tilstand og tegn på nytt
+    function renderGameData(newState) {
+      if (!newState) return;
+      currentGameState = { ...currentGameState, ...newState };
+      drawBoard();
+    }
+
+    // 6. Socket.IO lyttere med automatisk 'getGameState' ved tilkobling
     const socket = io();
 
-    // Lütt etter spilltilstand fra serveren
-    socket.on('gameState', (state) => {
-      renderGameData(state);
+    socket.on('connect', () => {
+      // Hent nåværende status med en gang tilkoblingen er opprettet
+      socket.emit('getGameState');
+      socket.emit('joinTable'); 
     });
 
-    socket.on('playersUpdated', (players) => {
-      renderGameData({ players: players });
+    socket.on('gameState', (state) => renderGameData(state));
+    socket.on('updateState', (state) => renderGameData(state));
+    socket.on('playersUpdated', (players) => renderGameData({ players: players }));
+    socket.on('playerJoined', (data) => {
+      if (data && data.players) {
+        renderGameData({ players: data.players });
+      } else {
+        socket.emit('getGameState');
+      }
     });
 
-    // Global eksponering
     window.updatePokerBoard = renderGameData;
   </script>
-</body>
-</html>
