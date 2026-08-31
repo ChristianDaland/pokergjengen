@@ -14,9 +14,11 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Oppretter tabellen 'hand_history' dersom den ikke eksisterer
+const DEFAULT_PLAYERS = ['Einar', 'Kai', 'Ronny', 'Joakim', 'Odd Christian'];
+
 async function initDB() {
   try {
+    // 1. Tabell for hånd-historikk
     await pool.query(`
       CREATE TABLE IF NOT EXISTS hand_history (
         id SERIAL PRIMARY KEY,
@@ -27,13 +29,31 @@ async function initDB() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    // Utvider tabellen med kolonnen hand_rank hvis tabellen fantes fra før
+    
     await pool.query(`
       ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS hand_rank INT DEFAULT 0;
     `);
-    console.log("Database-tabell 'hand_history' er klar!");
+
+    // 2. Tabell for dynamisk spillerliste
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS players (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL
+      );
+    `);
+
+    // Fyll inn standardspillere dersom tabellen er helt tom
+    const countRes = await pool.query('SELECT COUNT(*) FROM players');
+    if (parseInt(countRes.rows[0].count, 10) === 0) {
+      for (const name of DEFAULT_PLAYERS) {
+        await pool.query('INSERT INTO players (name) VALUES ($1) ON CONFLICT DO NOTHING', [name]);
+      }
+      console.log("Satte inn standardspillere i databasen.");
+    }
+
+    console.log("Database-tabeller er klare!");
   } catch (err) {
-    console.error("Feil ved opprettelse av databasetabell:", err);
+    console.error("Feil ved opprettelse av databasetabeller:", err);
   }
 }
 initDB();
@@ -43,9 +63,6 @@ app.use(express.static('public'));
 
 const SUITS = ['c', 'd', 'h', 's'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
-
-// De 5 faste spillerne
-const PRESET_PLAYERS = ['Einar', 'Kai', 'Ronny', 'Joakim', 'Odd Christian'];
 
 function createDeck() {
   const deck = [];
@@ -184,8 +201,25 @@ function startNewHandLogic() {
   });
 }
 
+// Hjelpefunksjon for å sende oppdatert spillerliste til alle
+async function sendPresetPlayers(targetSocket = null) {
+  try {
+    const res = await pool.query('SELECT name FROM players ORDER BY id ASC');
+    const playerNames = res.rows.map(r => r.name);
+    if (targetSocket) {
+      targetSocket.emit('preset_players', playerNames);
+    } else {
+      io.emit('preset_players', playerNames);
+    }
+  } catch (err) {
+    console.error("Feil ved henting av spillere:", err);
+    if (targetSocket) targetSocket.emit('preset_players', DEFAULT_PLAYERS);
+  }
+}
+
 io.on('connection', (socket) => {
-  socket.emit('preset_players', PRESET_PLAYERS);
+  // Send dynamisk spillerliste ved tilkobling
+  sendPresetPlayers(socket);
 
   socket.on('join_game', (name) => {
     const cleanName = name ? name.trim() : 'Spiller';
@@ -302,7 +336,6 @@ io.on('connection', (socket) => {
 
       const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
       const translatedHand = translateHandDescription(rawDescr);
-      // Hent rangering (tall) fra pokersolver
       const handRank = winners[0] && winners[0].solved ? (winners[0].solved.rank || 0) : 0;
 
       gameState.winnerInfo = {
@@ -311,7 +344,6 @@ io.on('connection', (socket) => {
         foldedWin: false
       };
 
-      // --- LAGRE VINNERHÅND OG RANGERINGSVERDI TIL DATABASE ---
       try {
         await pool.query(
           'INSERT INTO hand_history (player, hand, hand_rank, game_mode) VALUES ($1, $2, $3, $4)',
@@ -320,7 +352,6 @@ io.on('connection', (socket) => {
       } catch (dbErr) {
         console.error("Feil ved lagring av vinnerhånd til DB:", dbErr);
       }
-      // -------------------------------------
     }
     updateAll();
   });
@@ -342,7 +373,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Henter Topp 10 vinnerhender sortert etter BEST HÅND (hand_rank DESC)
   socket.on('get_top10', async (data) => {
     const period = data ? data.period : 'tonight';
     let timeQuery = '';
@@ -367,6 +397,54 @@ io.on('connection', (socket) => {
     } catch (err) {
       console.error("Feil ved henting av Topp 10 fra DB:", err);
       socket.emit('top10_data', []);
+    }
+  });
+
+  // --- ADMIN SYSTEM-LYTTERE ---
+
+  // Hent alle spillere for Admin-panelet
+  socket.on('admin_get_players', async () => {
+    try {
+      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
+      socket.emit('admin_players_list', res.rows);
+    } catch (err) {
+      console.error("Feil ved henting av admin spillere:", err);
+    }
+  });
+
+  // Legg til ny spiller
+  socket.on('admin_add_player', async (name) => {
+    if (!name || !name.trim()) return;
+    try {
+      await pool.query('INSERT INTO players (name) VALUES ($1) ON CONFLICT DO NOTHING', [name.trim()]);
+      sendPresetPlayers();
+      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
+      socket.emit('admin_players_list', res.rows);
+    } catch (err) {
+      console.error("Feil ved ny spiller:", err);
+    }
+  });
+
+  // Slett spiller
+  socket.on('admin_delete_player', async (id) => {
+    try {
+      await pool.query('DELETE FROM players WHERE id = $1', [id]);
+      sendPresetPlayers();
+      const res = await pool.query('SELECT * FROM players ORDER BY id ASC');
+      socket.emit('admin_players_list', res.rows);
+    } catch (err) {
+      console.error("Feil ved sletting av spiller:", err);
+    }
+  });
+
+  // Tøm håndhistorikk (Slett alt i Topp 10)
+  socket.on('admin_clear_history', async () => {
+    try {
+      await pool.query('DELETE FROM hand_history');
+      console.log("Håndhistorikk er tømt av admin!");
+      socket.emit('admin_action_success', 'Håndhistorikk / Topp 10 har blitt tømt!');
+    } catch (err) {
+      console.error("Feil ved tømming av historikk:", err);
     }
   });
 

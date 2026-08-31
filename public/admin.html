@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Løland Gård Poker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121824;
+      color: #fff;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1, h2 { color: #4a90e2; }
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #334155;
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 65%;
+      border-radius: 4px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: white;
+    }
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-add { background: #10b981; color: white; }
+    .btn-delete { background: #ef4444; color: white; padding: 5px 10px; margin-left: 10px; }
+    .btn-danger { background: #dc2626; color: white; width: 100%; padding: 15px; font-size: 16px; margin-top: 10px; }
+    ul { list-style: none; padding: 0; }
+    li {
+      padding: 10px 0;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <h1>🔒 Poker Admin Panel</h1>
+
+  <!-- SPILLEDER-ADMINISTRASJON -->
+  <div class="card">
+    <h2>Administrer Spillere</h2>
+    <div style="margin-bottom: 15px;">
+      <input type="text" id="newPlayerName" placeholder="Skriv inn nytt spillernavn...">
+      <button class="btn-add" onclick="addPlayer()">Legg til</button>
+    </div>
+    <ul id="playerList"></ul>
+  </div>
+
+  <!-- FARESONE: TØMMING AV DATA -->
+  <div class="card" style="border-color: #ef4444;">
+    <h2 style="color: #ef4444;">⚠️ Faresone</h2>
+    <p>Dette vil permanent slette all håndhistorikk / Topp 10 data fra databasen.</p>
+    <button class="btn-danger" onclick="clearHistory()">TØM HÅNDHISTORIKK (TOPP 10)</button>
+  </div>
+
+  <script>
+    const socket = io();
+
+    // Hent spillere ved oppstart
+    socket.emit('admin_get_players');
+
+    socket.on('admin_players_list', (players) => {
+      const list = document.getElementById('playerList');
+      list.innerHTML = '';
+      players.forEach(p => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>${p.name}</span>
+          <button class="btn-delete" onclick="deletePlayer(${p.id})">Slett</button>
+        `;
+        list.appendChild(li);
+      });
+    });
+
+    function addPlayer() {
+      const input = document.getElementById('newPlayerName');
+      const name = input.value.trim();
+      if (name) {
+        socket.emit('admin_add_player', name);
+        input.value = '';
+      }
+    }
+
+    function deletePlayer(id) {
+      if (confirm('Er du sikker på at du vil slette denne spilleren?')) {
+        socket.emit('admin_delete_player', id);
+      }
+    }
+
+    function clearHistory() {
+      if (confirm('ER DU SIKKER? Dette vil slette all Topp 10 historikk permanent!')) {
+        socket.emit('admin_clear_history');
+      }
+    }
+
+    socket.on('admin_action_success', (msg) => {
+      alert(msg);
+    });
+  </script>
+</body>
+</html>
