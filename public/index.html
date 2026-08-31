@@ -3,261 +3,456 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Løland Poker - Kontrollpanel</title>
-  <script src="/socket.io/socket.io.js"></script>
+  <title>Løland Gård Poker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; }
+
     body {
-      background-color: #0f172a;
-      color: #f8fafc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: Arial, sans-serif;
+      background-color: #1b4d2e;
+      color: white;
+      text-align: center;
       margin: 0;
-      padding: 20px;
+      padding: 10px 15px 90px 15px;
+    }
+
+    h1 {
+      margin: 5px 0 10px 0;
+      font-size: 1.8rem;
+    }
+
+    .winner-banner {
+      background: linear-gradient(45deg, #ff9800, #f44336);
+      color: white;
+      padding: 12px 18px;
+      font-size: 1.4rem;
+      font-weight: bold;
+      border-radius: 12px;
+      margin: 0 auto 12px auto;
+      max-width: 900px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.98); }
+      100% { transform: scale(1.01); }
+    }
+
+    .main-layout {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 15px;
+      max-width: 1150px;
+      margin: 0 auto;
+    }
+
+    .poker-table {
+      flex: 1;
+      border: 8px solid #5c3a21;
+      background-color: #2e7d32;
+      border-radius: 60px;
+      padding: 15px;
+      min-height: 380px;
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+    }
+
+    .sidebar-right {
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100vh;
+      gap: 12px;
+      width: 160px;
     }
 
-    .top-bar {
+    .qr-box {
+      background-color: rgba(0, 0, 0, 0.6);
+      border: 2px solid #ffffff;
+      border-radius: 16px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       width: 100%;
-      max-width: 650px;
+    }
+
+    .cards-container {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      min-height: 105px;
+      margin: 10px 0;
+    }
+
+    .card {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #ffffff;
+      border-radius: 10px;
+      width: 70px;
+      height: 100px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      font-weight: bold;
+      position: relative;
+      user-select: none;
+    }
+
+    .card.red { color: #d9534f; }
+    .card.black { color: #222222; }
+
+    .card-corner {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1;
+    }
+    .card-corner.top-left { top: 6px; left: 6px; }
+    .card-corner.bottom-right { bottom: 6px; right: 6px; transform: rotate(180deg); }
+
+    .card-corner .val { font-size: 0.95rem; font-weight: bold; }
+    .card-corner .suit { font-size: 0.85rem; }
+
+    .card-center-graphic {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .pip-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .pip {
+      position: absolute;
+      font-size: 0.85rem;
+      transform: translate(-50%, -50%);
+    }
+
+    .pip.flip {
+      transform: translate(-50%, -50%) rotate(180deg);
+    }
+
+    .face-text {
+      font-size: 0.75rem;
+      font-weight: bold;
+      opacity: 0.8;
+    }
+
+    .players-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .player-card {
+      background: rgba(0,0,0,0.7);
+      border: 2px solid #fff;
+      border-radius: 12px;
+      padding: 10px 14px;
+      min-width: 150px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #ff5722;
+      color: white;
+      font-size: 0.8rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-top: 4px;
+      font-weight: bold;
+    }
+
+    .controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(15, 35, 20, 0.95);
+      padding: 12px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      position: relative;
-    }
-
-    .hamburger-btn {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: white;
-      font-size: 1.2rem;
-      padding: 8px 14px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    .dropdown-menu {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: 45px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      width: 240px;
+      box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.5);
       z-index: 100;
-      overflow: hidden;
     }
 
-    .dropdown-menu.show { display: block; }
-    .dropdown-menu a, .dropdown-menu button {
-      display: block;
-      width: 100%;
-      padding: 12px 16px;
-      color: #f8fafc;
-      text-decoration: none;
+    .controls-left {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .version-tag {
+      font-size: 0.85rem;
+      color: #888888;
+      font-weight: bold;
+      user-select: none;
+    }
+
+    button {
+      padding: 10px 16px;
       font-size: 0.95rem;
       border: none;
-      background: none;
-      text-align: left;
+      border-radius: 8px;
       cursor: pointer;
-      border-bottom: 1px solid #334155;
-    }
-    .dropdown-menu a:hover, .dropdown-menu button:hover { background: #334155; }
-
-    .card-box {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 16px;
-      padding: 25px;
-      width: 100%;
-      max-width: 650px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    }
-
-    h1 { color: #ffd700; margin-top: 0; text-align: center; }
-    h2 { color: #38bdf8; margin-top: 0; }
-
-    button.btn {
-      width: 100%;
-      padding: 14px;
-      border-radius: 10px;
-      border: none;
-      font-size: 1.1rem;
       font-weight: bold;
-      cursor: pointer;
-      margin-top: 15px;
-      transition: background 0.2s;
+      transition: all 0.2s ease;
     }
-    .btn-green { background: #059669; color: white; }
-    .btn-green:hover { background: #10b981; }
-    .btn-blue { background: #2563eb; color: white; }
-    .btn-blue:hover { background: #3b82f6; }
-    .btn-red { background: #dc2626; color: white; }
 
-    select {
-      width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #475569;
-      background: #0f172a;
+    button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      filter: grayscale(100%);
+    }
+
+    .btn-mode { background-color: #ffffff; color: #333; }
+    .btn-change-mode { background-color: #607d8b; color: white; }
+    .btn-action { background-color: #4caf50; color: white; }
+    .btn-help { background-color: #009688; color: white; }
+
+    .btn-open-board {
+      background-color: #ff9800;
       color: white;
-      font-size: 1rem;
-      margin-top: 5px;
+      font-size: 0.85rem;
+      padding: 10px 8px;
+      width: 100%;
+      border-radius: 10px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+    .btn-open-board:hover {
+      background-color: #f57c00;
     }
 
-    .player-list {
-      list-style: none;
-      padding: 0;
-      margin: 15px 0;
-    }
-    .player-item {
-      background: #0f172a;
-      border: 1px solid #334155;
-      padding: 10px 15px;
-      border-radius: 8px;
-      margin-bottom: 8px;
+    .btn-next-large {
+      background: linear-gradient(135deg, #1e88e5, #1565c0);
+      color: white;
+      font-size: 1.2rem;
+      height: 140px;
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      letter-spacing: 0.5px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: center;
+      text-align: center;
     }
-    .status-dot {
-      height: 10px;
-      width: 10px;
-      border-radius: 50%;
-      display: inline-block;
+    .btn-next-large:hover:not(:disabled) {
+      transform: scale(1.02);
+      background: linear-gradient(135deg, #2196f3, #1e88e5);
     }
-    .online { background-color: #22c55e; }
-    .offline { background-color: #64748b; }
   </style>
 </head>
 <body>
 
-  <div class="top-bar">
-    <div style="font-size: 1.2rem; font-weight: bold; color: #ffd700;">♠️ Løland Poker Control</div>
-    <div style="position: relative;">
-      <button class="hamburger-btn" onclick="toggleMenu()">☰ Meny</button>
-      <div class="dropdown-menu" id="dropdown-menu">
-        <a href="/board" target="_blank">🖥️ Åpne Bordskjerm</a>
-        <button onclick="resetSession()">🔄 Nullstill Hele Spillet</button>
+  <h1>Løland Gård Poker</h1>
+
+  <div id="winner-banner" class="winner-banner" style="display: none;"></div>
+
+  <div class="main-layout">
+    <div class="poker-table">
+      <h2 id="game-info" style="margin-top: 0; font-size: 1.3rem;">Spillere kan logge inn nå</h2>
+      
+      <div id="board-cards" class="cards-container"></div>
+      <div id="players-list" class="players-container"></div>
+    </div>
+
+    <div class="sidebar-right">
+      <div class="qr-box">
+        <p style="margin: 0 0 8px 0; font-size: 0.85rem; font-weight: bold;">Skann for å bli med:</p>
+        <div id="qrcode"></div>
       </div>
+
+      <button class="btn-open-board" onclick="openBoardWindow()">🖥️ Åpne Bordvisning</button>
+
+      <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
     </div>
   </div>
 
-  <!-- FASE 1: LOBBY & OPPSETT -->
-  <div class="card-box" id="lobby-view">
-    <h2>Fase 1: Oppsett av spillkveld</h2>
-    <p style="color: #94a3b8;">Spillerne skanner QR-koden på bordskjermen (eller går til mobiladressen) for å logge inn.</p>
+  <div class="controls">
+    <div class="controls-left">
+      <div id="mode-selection" style="display: flex; gap: 10px;">
+        <button class="btn-mode" onclick="setMode('TEXAS')">Texas Hold'em</button>
+        <button class="btn-mode" onclick="setMode('OMAHA')">Omaha</button>
+      </div>
 
-    <a href="/board" target="_blank" style="text-decoration: none;">
-      <button class="btn btn-green" style="margin-bottom: 20px;">🖥️ Åpne Bordskjerm (For TV/Projektor)</button>
-    </a>
+      <div id="game-controls" style="display: none; gap: 10px;">
+        <button id="btn-change-mode" class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
+        <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
+      </div>
 
-    <label style="display:block; text-align:left; color:#cbd5e1;">Velg Spillmodus:</label>
-    <select id="game-mode-select" onchange="changeGameMode()">
-      <option value="OMAHA">Omaha (4 kort på hånden)</option>
-      <option value="TEXAS">Texas Hold'em (2 kort på hånden)</option>
-    </select>
-
-    <h3 style="margin-top: 20px; color: #cbd5e1;">Tilkoblede spillere (<span id="player-count">0</span>):</h3>
-    <ul class="player-list" id="lobby-player-list">
-      <li style="color: #64748b; font-style: italic;">Ingen spillere tilkoblet ennå...</li>
-    </ul>
-
-    <button class="btn btn-blue" onclick="startSession()">▶ Start Spillet (Trekk plasser)</button>
-  </div>
-
-  <!-- FASE 2: SPILLEKONTROLL -->
-  <div class="card-box" id="game-view" style="display: none;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h2>Fase 2: Pågående Spill</h2>
-      <span id="current-phase-badge" style="background: #334155; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.9rem;">VENTING</span>
+      <button class="btn-help" onclick="openHelpWindow()">📖 Spilleveiledning</button>
     </div>
 
-    <div style="margin: 15px 0;">
-      <button class="btn btn-green" onclick="nextPhase()" id="next-phase-btn">▶ Neste Fase (Flop / Turn / River)</button>
-      <button class="btn btn-blue" onclick="startNewHand()" style="margin-top: 10px;">🃏 Gi Nye Hender (Ny runde)</button>
-    </div>
-
-    <h3 style="margin-top: 20px; color: #cbd5e1;">Spillere rundt bordet:</h3>
-    <ul class="player-list" id="game-player-list"></ul>
+    <div class="version-tag">Versjon 2.10</div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
 
-    function toggleMenu() {
-      document.getElementById('dropdown-menu').classList.toggle('show');
-    }
+    const mobileUrl = window.location.origin + '/mobile.html';
+    new QRCode(document.getElementById("qrcode"), {
+      text: mobileUrl,
+      width: 95,
+      height: 95
+    });
 
-    function changeGameMode() {
-      const mode = document.getElementById('game-mode-select').value;
-      socket.emit('set_game_mode', mode);
-    }
-
-    function startSession() {
-      const mode = document.getElementById('game-mode-select').value;
-      socket.emit('start_session', { hostName: 'Odd Christian', gameMode: mode });
-    }
-
-    function resetSession() {
-      if (confirm("Er du sikker på at du vil nullstille hele sesjonen? All data slettes.")) {
-        socket.emit('reset_session');
+    function renderPips(rawVal, suitSymbol) {
+      if (rawVal === 'A') {
+        return `<div class="pip-container"><div class="pip" style="top: 50%; left: 50%; font-size: 2.2rem;">${suitSymbol}</div></div>`;
       }
+      const val = parseInt(rawVal === 'T' ? '10' : rawVal, 10);
+      if (isNaN(val)) return '';
+
+      const positions = [];
+      if (val === 2) positions.push({ x: 50, y: 15 }, { x: 50, y: 85, flip: true });
+      else if (val === 3) positions.push({ x: 50, y: 15 }, { x: 50, y: 50 }, { x: 50, y: 85, flip: true });
+      else if (val === 4) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
+      else if (val === 5) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 50, y: 50 }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
+      else if (val === 6) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 25, y: 50 }, { x: 75, y: 50 }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
+      else if (val === 7) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 50, y: 32.5 }, { x: 25, y: 50 }, { x: 75, y: 50 }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
+      else if (val === 8) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 50, y: 32.5 }, { x: 25, y: 50 }, { x: 75, y: 50 }, { x: 50, y: 67.5, flip: true }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
+      else if (val === 9) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 25, y: 38 }, { x: 75, y: 38 }, { x: 50, y: 50 }, { x: 25, y: 62, flip: true }, { x: 75, y: 62, flip: true }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
+      else if (val === 10) positions.push({ x: 25, y: 15 }, { x: 75, y: 15 }, { x: 50, y: 27.5 }, { x: 25, y: 38 }, { x: 75, y: 38 }, { x: 25, y: 62, flip: true }, { x: 75, y: 62, flip: true }, { x: 50, y: 72.5, flip: true }, { x: 25, y: 85, flip: true }, { x: 75, y: 85, flip: true });
+
+      let html = '<div class="pip-container">';
+      positions.forEach(p => {
+        html += `<div class="pip ${p.flip ? 'flip' : ''}" style="top: ${p.y}%; left: ${p.x}%;">${suitSymbol}</div>`;
+      });
+      html += '</div>';
+      return html;
     }
 
-    function startNewHand() {
-      socket.emit('start_new_hand');
+    function formatCard(cardCode) {
+      if (!cardCode) return '';
+      let rawVal = cardCode.slice(0, -1).toUpperCase();
+      let displayVal = rawVal === 'T' ? '10' : rawVal;
+      const suitChar = cardCode.slice(-1).toLowerCase();
+      
+      const suits = {
+        'h': { symbol: '♥', color: 'red' },
+        'd': { symbol: '♦', color: 'red' },
+        'c': { symbol: '♣', color: 'black' },
+        's': { symbol: '♠', color: 'black' }
+      };
+      
+      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
+
+      const faceGraphics = {
+        'J': '<div class="face-text">KNEKT</div>',
+        'Q': '<div class="face-text">DRONNING</div>',
+        'K': '<div class="face-text">KONGE</div>'
+      };
+
+      let centerHTML = faceGraphics[rawVal] ? faceGraphics[rawVal] : renderPips(rawVal, suit.symbol);
+
+      return `
+        <div class="card ${suit.color}">
+          <div class="card-corner top-left">
+            <span class="val">${displayVal}</span>
+            <span class="suit">${suit.symbol}</span>
+          </div>
+          <div class="card-center-graphic">
+            ${centerHTML}
+          </div>
+          <div class="card-corner bottom-right">
+            <span class="val">${displayVal}</span>
+            <span class="suit">${suit.symbol}</span>
+          </div>
+        </div>
+      `;
     }
 
-    function nextPhase() {
-      socket.emit('next_phase');
+    function setMode(mode) { socket.emit('set_game_mode', mode); }
+    function resetMode() { socket.emit('set_game_mode', null); }
+    function startNewHand() { socket.emit('start_new_hand'); }
+    function nextPhase() { socket.emit('next_phase'); }
+
+    function openBoardWindow() {
+      window.open('/board.html', 'PokerBoard', 'width=1200,height=800');
+    }
+
+    function openHelpWindow() {
+      window.open('/veiledning.html', 'PokerVeiledning', 'width=750,height=800');
     }
 
     socket.on('state_update', (state) => {
-      const lobbyView = document.getElementById('lobby-view');
-      const gameView = document.getElementById('game-view');
+      const modeSelection = document.getElementById('mode-selection');
+      const gameControls = document.getElementById('game-controls');
+      const gameInfo = document.getElementById('game-info');
+      const changeModeBtn = document.getElementById('btn-change-mode');
+      const startHandBtn = document.getElementById('btn-start-hand');
+      const nextBtn = document.getElementById('btn-next-phase');
 
-      if (state.sessionStarted) {
-        lobbyView.style.display = 'none';
-        gameView.style.display = 'block';
+      if (!state.gameMode) {
+        modeSelection.style.display = 'flex';
+        gameControls.style.display = 'none';
+        nextBtn.style.display = 'none';
+        gameInfo.innerText = 'Velg spilletype for å begynne';
       } else {
-        lobbyView.style.display = 'block';
-        gameView.style.display = 'none';
+        modeSelection.style.display = 'none';
+        gameControls.style.display = 'flex';
+        nextBtn.style.display = 'flex';
+        gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       }
 
-      // Oppdater Lobby Spillere
-      const lobbyList = document.getElementById('lobby-player-list');
-      document.getElementById('player-count').innerText = state.players.length;
+      const isRoundActive = state.phase !== 'VENTING' && state.phase !== 'SHOWDOWN';
+      changeModeBtn.disabled = isRoundActive;
+      startHandBtn.disabled = isRoundActive;
 
-      if (state.players.length > 0) {
-        lobbyList.innerHTML = state.players.map(p => `
-          <li class="player-item">
-            <span><strong>${p.name}</strong></span>
-            <span class="status-dot ${p.connected ? 'online' : 'offline'}"></span>
-          </li>
-        `).join('');
+      if (state.phase === 'PREFLOP') {
+        nextBtn.innerText = 'Åpne Flopp';
+      } else if (state.phase === 'FLOP') {
+        nextBtn.innerText = 'Åpne Turn';
+      } else if (state.phase === 'TURN') {
+        nextBtn.innerText = 'Åpne River';
+      } else if (state.phase === 'RIVER') {
+        nextBtn.innerText = 'Vis Vinner (Showdown)';
+      } else if (state.phase === 'SHOWDOWN') {
+        nextBtn.innerText = 'Ny Runde';
       } else {
-        lobbyList.innerHTML = `<li style="color: #64748b; font-style: italic;">Ingen spillere tilkoblet ennå...</li>`;
+        nextBtn.innerText = 'Neste Fase';
       }
 
-      // Oppdater Spill-fase & Spilleliste
-      document.getElementById('current-phase-badge').innerText = state.phase;
-      const gameList = document.getElementById('game-player-list');
-      gameList.innerHTML = state.players.map(p => `
-        <li class="player-item">
-          <div>
-            <strong>Sete ${p.seat}: ${p.name}</strong> 
-            ${p.role ? `<span style="color:#ffd700; font-size:0.85rem;">(${p.role})</span>` : ''}
+      const banner = document.getElementById('winner-banner');
+      if (state.winnerInfo) {
+        banner.innerHTML = `🏆 VINNER: ${state.winnerInfo.winnerName} (${state.winnerInfo.descr})`;
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+
+      const boardContainer = document.getElementById('board-cards');
+      boardContainer.innerHTML = state.board.map(c => formatCard(c)).join('');
+
+      const playersContainer = document.getElementById('players-list');
+      playersContainer.innerHTML = state.players.map(p => `
+        <div class="player-card">
+          <div><strong>${p.name}</strong></div>
+          <div style="font-size: 0.8rem; color: #ccc;">Plass ${p.seat} | Poeng: ${p.points}</div>
+          ${p.role ? `<span class="badge">${p.role}</span>` : ''}
+          <div style="font-size: 0.8rem; margin-top: 4px;">
+            ${p.folded ? '🔴 FOLDET' : '🟢 INNE'}
           </div>
-          <span style="font-size:0.85rem; color:${p.folded ? '#ef4444' : '#22c55e'};">
-            ${p.folded ? 'Kastet' : 'Med'}
-          </span>
-        </li>
+          ${p.cards && p.cards.length > 0 ? `
+            <div style="margin-top: 6px; display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+              ${p.cards.map(c => formatCard(c)).join('')}
+            </div>
+          ` : ''}
+        </div>
       `).join('');
     });
   </script>

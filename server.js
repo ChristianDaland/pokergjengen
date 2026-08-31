@@ -9,11 +9,6 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-// Ruting for bordvisning
-app.get('/board', (req, res) => {
-  res.sendFile(__dirname + '/public/board.html');
-});
-
 const SUITS = ['c', 'd', 'h', 's'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
@@ -42,6 +37,7 @@ function formatForSolver(card) {
 
 function translateHandDescription(descr) {
   let text = descr;
+
   text = text.replace(/\bT\b/g, '10');
   text = text.replace(/Straight Flush/g, 'Straight Flush');
   text = text.replace(/Four of a Kind/g, 'Fire like');
@@ -52,10 +48,12 @@ function translateHandDescription(descr) {
   text = text.replace(/Two Pair/g, 'To Par');
   text = text.replace(/Pair/g, 'Ett Par');
   text = text.replace(/High Card/g, 'Høyt Kort');
+
   text = text.replace(/Spades/g, 'Spar');
   text = text.replace(/Hearts/g, 'Hjerter');
   text = text.replace(/Diamonds/g, 'Ruter');
   text = text.replace(/Clubs/g, 'Kløver');
+
   return text;
 }
 
@@ -96,44 +94,18 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
 }
 
 let gameState = {
-  sessionStarted: false,
-  hostName: 'Odd Christian',
-  gameMode: 'OMAHA',
+  gameMode: null,
   phase: 'VENTING',
   board: [],
   deck: [],
   winnerInfo: null,
-  dealerIndex: 0
+  dealerIndex: 0,
+  leaderboard: [],
+  gameNightStats: {}
 };
 
 let players = {};
-
-function addOrUpdatePlayer(name, socketId = null) {
-  const cleanName = name ? name.trim() : 'Spiller';
-  let existingKey = Object.keys(players).find(
-    k => players[k].name.toLowerCase() === cleanName.toLowerCase()
-  );
-
-  if (existingKey) {
-    if (socketId) players[existingKey].socketId = socketId;
-    players[existingKey].connected = true;
-    return existingKey;
-  } else {
-    const seatNumber = Object.keys(players).length + 1;
-    const id = socketId || ('p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
-    players[id] = {
-      id: id,
-      socketId: socketId,
-      name: cleanName,
-      seat: seatNumber,
-      cards: [],
-      folded: false,
-      role: '',
-      connected: true
-    };
-    return id;
-  }
-}
+const disconnectTimeouts = {};
 
 function randomizePlayerSeats() {
   const playerArray = Object.values(players);
@@ -185,39 +157,51 @@ function startNewHandLogic() {
 }
 
 io.on('connection', (socket) => {
-
-  socket.on('playerJoined', (data) => {
-    if (data && data.playerName) {
-      addOrUpdatePlayer(data.playerName, socket.id);
-      updateAll();
-    }
-  });
-
   socket.on('join_game', (name) => {
-    addOrUpdatePlayer(name, socket.id);
-    updateAll();
-  });
+    const cleanName = name ? name.trim() : 'Spiller';
+    
+    let existingPlayerKey = Object.keys(players).find(
+      key => players[key].name.toLowerCase() === cleanName.toLowerCase()
+    );
 
-  socket.on('start_session', (data) => {
-    gameState.sessionStarted = true;
-    if (data && data.hostName) gameState.hostName = data.hostName;
-    if (data && data.gameMode) gameState.gameMode = data.gameMode;
-    randomizePlayerSeats();
-    updateAll();
-  });
+    if (existingPlayerKey) {
+      const playerData = players[existingPlayerKey];
+      delete players[existingPlayerKey];
+      
+      if (disconnectTimeouts[existingPlayerKey]) {
+        clearTimeout(disconnectTimeouts[existingPlayerKey]);
+        delete disconnectTimeouts[existingPlayerKey];
+      }
 
-  socket.on('reset_session', () => {
-    gameState.sessionStarted = false;
-    gameState.phase = 'VENTING';
-    gameState.board = [];
-    gameState.winnerInfo = null;
-    players = {};
+      playerData.id = socket.id;
+      playerData.connected = true;
+      players[socket.id] = playerData;
+    } else {
+      const seatNumber = Object.keys(players).length + 1;
+      players[socket.id] = {
+        id: socket.id,
+        name: cleanName,
+        seat: seatNumber,
+        cards: [],
+        folded: false,
+        role: '',
+        connected: true,
+        points: 0
+      };
+    }
+
     updateAll();
   });
 
   socket.on('set_game_mode', (mode) => {
     gameState.gameMode = mode;
-    randomizePlayerSeats();
+    if (!mode) {
+      gameState.phase = 'VENTING';
+      gameState.board = [];
+      gameState.winnerInfo = null;
+    } else {
+      randomizePlayerSeats();
+    }
     updateAll();
   });
 
@@ -242,6 +226,7 @@ io.on('connection', (socket) => {
         descr: 'Alle andre kastet seg',
         foldedWin: true
       };
+      activePlayers[0].points = (activePlayers[0].points || 0) + 1;
       updateAll();
       return;
     }
@@ -272,8 +257,12 @@ io.on('connection', (socket) => {
       if (winners.length > 1) {
         const names = winners.map(w => w.player.name).join(' & ');
         winnerText = `UAVGJOERT / DELING: ${names}`;
+        winners.forEach(w => {
+          w.player.points = (w.player.points || 0) + 1;
+        });
       } else {
         winnerText = winners[0].player.name;
+        winners[0].player.points = (winners[0].player.points || 0) + 2;
       }
 
       const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
@@ -287,51 +276,75 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
-  socket.on('disconnect', () => {
-    const playerKey = Object.keys(players).find(k => players[k].socketId === socket.id);
-    if (playerKey) {
-      players[playerKey].connected = false;
+  socket.on('player_fold', () => {
+    if (players[socket.id]) {
+      players[socket.id].folded = true;
+      
+      const activePlayers = Object.values(players).filter(p => !p.folded);
+      if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
+        gameState.phase = 'FINISHED';
+        gameState.winnerInfo = {
+          winnerName: activePlayers[0].name,
+          descr: 'Alle andre kastet seg',
+          foldedWin: true
+        };
+        activePlayers[0].points = (activePlayers[0].points || 0) + 1;
+      }
       updateAll();
     }
   });
 
-  socket.emit('state_update', buildStatePayload());
+  socket.on('disconnect', () => {
+    if (players[socket.id]) {
+      players[socket.id].connected = false;
+      const disconnectedId = socket.id;
+
+      disconnectTimeouts[disconnectedId] = setTimeout(() => {
+        delete players[disconnectedId];
+        delete disconnectTimeouts[disconnectedId];
+        updateAll();
+      }, 45000);
+
+      updateAll();
+    }
+  });
 });
 
-function buildStatePayload() {
+function updateAll() {
   const playerList = Object.values(players);
+
   const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && 
                             gameState.winnerInfo && 
                             !gameState.winnerInfo.foldedWin;
 
-  return {
-    sessionStarted: gameState.sessionStarted,
-    hostName: gameState.hostName,
+  io.emit('state_update', {
     gameMode: gameState.gameMode,
     phase: gameState.phase,
     board: gameState.board,
     winnerInfo: gameState.winnerInfo,
+    leaderboard: gameState.leaderboard,
+    gameNightStats: gameState.gameNightStats,
     players: playerList.map(p => ({
+      id: p.id,
       name: p.name,
       seat: p.seat,
       role: p.role,
       folded: p.folded,
       connected: p.connected,
+      points: p.points || 0,
       cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
-  };
-}
+  });
 
-function updateAll() {
-  io.emit('state_update', buildStatePayload());
-
-  Object.values(players).forEach(p => {
-    if (p.socketId) {
-      io.to(p.socketId).emit('your_cards', {
-        cards: p.cards || [],
-        role: p.role || '',
-        gameMode: gameState.gameMode,
-        phase: gameState.phase
+  playerList.forEach(p => {
+    if (p.connected) {
+      io.to(p.id).emit('player_state', {
+        phase: gameState.phase,
+        cards: p.cards,
+        role: p.role,
+        folded: p.folded,
+        winnerInfo: gameState.winnerInfo,
+        points: p.points || 0
       });
     }
   });
