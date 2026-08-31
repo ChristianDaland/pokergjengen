@@ -2,203 +2,67 @@
 <html lang="no">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Løland Gård Poker - Mobil</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Løland Gård Poker – Mobil</title>
   <style>
-    * { box-sizing: border-box; }
-
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #081c15;
-      color: white;
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
-
-    .card-panel {
-      background: #1b4332;
-      border: 2px solid #52b788;
-      border-radius: 16px;
-      padding: 24px;
-      width: 100%;
-      max-width: 400px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-      text-align: center;
-    }
-
-    h2 { margin-top: 0; color: #74c69d; }
-
-    .input-group {
-      margin-bottom: 20px;
-      text-align: left;
-    }
-
-    label {
-      display: block;
-      font-size: 0.9rem;
-      margin-bottom: 8px;
-      color: #b7e4c7;
-    }
-
-    select {
-      width: 100%;
-      padding: 14px;
-      border-radius: 8px;
-      border: 1px solid #52b788;
-      background: #081c15;
-      color: white;
-      font-size: 1.1rem;
-      outline: none;
-      cursor: pointer;
-    }
-
-    .btn {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 8px;
-      background: #2d6a4f;
-      color: white;
-      font-size: 1.1rem;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .btn:hover { background: #40916c; }
-
-    .player-status {
-      display: none;
-    }
-
-    .cards-row {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin-top: 20px;
-    }
-
-    .card {
-      background: white;
-      border-radius: 8px;
-      width: 60px;
-      height: 90px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px;
-      font-weight: bold;
-      color: black;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    }
-    .card.red { color: #d9534f; }
-    .card-val { font-size: 1.1rem; }
-    .card-suit { font-size: 1.5rem; }
+    body { font-family: Arial, sans-serif; background: #081c15; color: white; padding: 20px; text-align: center; }
+    .btn-player { background: #52b788; color: #081c15; font-size: 1.5rem; font-weight: bold; border: none; padding: 15px; width: 100%; margin-bottom: 15px; border-radius: 10px; cursor: pointer; }
+    .cards-row { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+    .card { background: white; color: black; border-radius: 8px; width: 70px; height: 105px; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <div class="card-panel">
-    <!-- Logg inn skjerm -->
-    <div id="login-section">
-      <h2>Velg din profil</h2>
-      <div class="input-group">
-        <label for="player-select">Hvem er du?</label>
-        <select id="player-select">
-          <option value="" disabled selected>-- Velg navn --</option>
-          <option value="Odd Christian">Odd Christian</option>
-          <option value="Einar">Einar</option>
-          <option value="Kai">Kai</option>
-          <option value="Ronny">Ronny</option>
-          <option value="Joakim">Joakim</option>
-        </select>
-      </div>
-      <button class="btn" onclick="joinGame()">Bli med!</button>
-    </div>
+  <h1>Løland Gård Poker</h1>
 
-    <!-- Aktiv Spiller Skjerm -->
-    <div id="status-section" class="player-status">
-      <h3 style="margin-bottom: 5px;">Velkommen, <span id="display-name" style="color: #74c69d;"></span>!</h3>
-      <p style="color: #b7e4c7; font-size: 0.9rem;">Du er nå koblet til storskjermen.</p>
-      
-      <div style="margin-top: 20px;">
-        <h4>Dine Kort:</h4>
-        <div id="my-cards" class="cards-row">
-          <p style="color: #aaa; font-style: italic;">Venter på neste runde...</p>
-        </div>
-      </div>
-    </div>
+  <div id="login-view">
+    <h3>Velg din profil:</h3>
+    <div id="players-buttons"></div>
+  </div>
+
+  <div id="game-view" style="display: none;">
+    <h2 id="welcome-msg"></h2>
+    <h3>Dine kort:</h3>
+    <div id="my-cards" class="cards-row"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let myName = localStorage.getItem('poker_user');
 
-    // Hent lagret navn fra mobilen hvis det finnes
-    const savedName = localStorage.getItem('poker_player_name');
-    if (savedName) {
-      const select = document.getElementById('player-select');
-      select.value = savedName;
-    }
-
-    function joinGame() {
-      const select = document.getElementById('player-select');
-      const selectedName = select.value;
-
-      if (!selectedName) {
-        alert('Vennligst velg navnet ditt fra listen!');
-        return;
+    socket.on('session_update', (session) => {
+      if (!myName) {
+        // Viser KUN de som er huket av som til stede
+        const btnDiv = document.getElementById('players-buttons');
+        btnDiv.innerHTML = session.presentPlayers.map(p => `
+          <button class="btn-player" onclick="selectPlayer('${p}')">${p}</button>
+        `).join('');
+      } else {
+        showGameView();
       }
+    });
 
-      // Lagre navnet lokalt på mobilen
-      localStorage.setItem('poker_player_name', selectedName);
-
-      // Send navnet til serveren
-      socket.emit('join_game', { name: selectedName });
-
-      // Bytt visning på mobilen
-      document.getElementById('login-section').style.display = 'none';
-      document.getElementById('status-section').style.display = 'block';
-      document.getElementById('display-name').innerText = selectedName;
+    function selectPlayer(name) {
+      myName = name;
+      localStorage.setItem('poker_user', name);
+      showGameView();
     }
 
-    function formatCard(cardCode) {
-      if (!cardCode) return '';
-      let rawVal = cardCode.slice(0, -1).toUpperCase();
-      let displayVal = rawVal === 'T' ? '10' : rawVal;
-      const suitChar = cardCode.slice(-1).toLowerCase();
-      
-      const suits = {
-        'h': { symbol: '♥', color: 'red' },
-        'd': { symbol: '♦', color: 'red' },
-        'c': { symbol: '♣', color: 'black' },
-        's': { symbol: '♠', color: 'black' }
-      };
-      
-      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
-
-      return `
-        <div class="card ${suit.color}">
-          <div class="card-val">${displayVal}</div>
-          <div class="card-suit">${suit.symbol}</div>
-        </div>
-      `;
+    function showGameView() {
+      document.getElementById('login-view').style.display = 'none';
+      document.getElementById('game-view').style.display = 'block';
+      document.getElementById('welcome-msg').innerText = `Spiller: ${myName}`;
     }
 
-    // Lytt på oppdateringer for egne kort
-    socket.on('your_cards', (cards) => {
-      const container = document.getElementById('my-cards');
-      if (!cards || cards.length === 0) {
-        container.innerHTML = '<p style="color: #aaa; font-style: italic;">Venter på neste runde...</p>';
-        return;
+    socket.on('game_state', (state) => {
+      if (!myName) return;
+      const me = state.players.find(p => p.name === myName);
+      if (me && me.cards) {
+        document.getElementById('my-cards').innerHTML = me.cards.map(c => `
+          <div class="card">${c}</div>
+        `).join('');
       }
-      container.innerHTML = cards.map(c => formatCard(c)).join('');
     });
   </script>
 </body>

@@ -8,115 +8,169 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-let fullDeck = [];
-let gameState = {
+const FIXED_PLAYERS = ['Kai', 'Ronny', 'Einar', 'Joakim', 'Odd Christian'];
+
+let session = {
+  active: false,
+  date: new Date().toISOString().split('T')[0],
   host: 'Odd Christian',
   mode: "Texas Hold'em",
-  phase: 'VENTING', // VENTING, PREFLOP, FLOP, TURN, RIVER, SHOWDOWN
-  communityCards: [],
-  players: [],
-  winner: null
+  presentPlayers: [...FIXED_PLAYERS],
+  notes: '',
+  round: 1,
+  phase: 'PRE_GAME' // PRE_GAME, ACTIVE_GAME, POST_ROUND
 };
 
-let stats = {}; 
+let deck = [];
+let gameState = {
+  communityCards: [],
+  players: [], // { name, active, eliminated, rank, points, totalPoints, cards }
+  roundEliminatedCount: 0
+};
+
+let history = []; // Lagrede sesjoner
+let top10AllTime = [];
 
 function createDeck() {
   const suits = ['h', 'd', 'c', 's'];
   const values = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
-  let deck = [];
+  let d = [];
   for (let s of suits) {
-    for (let v of values) {
-      deck.push(v + s);
-    }
+    for (let v of values) d.push(v + s);
   }
-  for (let i = deck.length - 1; i > 0; i--) {
+  for (let i = d.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
+    [d[i], d[j]] = [d[j], d[i]];
   }
-  return deck;
+  return d;
 }
 
 io.on('connection', (socket) => {
+  socket.emit('session_update', session);
   socket.emit('game_state', gameState);
-  socket.emit('players_updated', gameState.players);
 
-  socket.on('join_game', (data) => {
-    const playerName = typeof data === 'string' ? data : data.name;
-    let existingPlayer = gameState.players.find(p => p.name === playerName);
-    
-    if (existingPlayer) {
-      existingPlayer.id = socket.id;
-    } else {
-      gameState.players.push({
-        id: socket.id,
-        name: playerName,
-        points: 0,
-        cards: []
-      });
-    }
-
-    if (!stats[playerName]) {
-      stats[playerName] = { name: playerName, wins: 0 };
-    }
-
-    io.emit('players_updated', gameState.players);
-    io.emit('game_state', gameState);
+  // Pre-Game Setup
+  socket.on('setup_session', (data) => {
+    session.host = data.host;
+    session.mode = data.mode;
+    session.presentPlayers = data.presentPlayers;
+    session.notes = data.notes;
+    io.emit('session_update', session);
   });
 
-  // Start ny runde / Del ut spillerkort (Preflop)
-  socket.on('start_next_round', () => {
-    if (gameState.players.length === 0) return;
+  socket.on('start_spillekveld', () => {
+    session.active = true;
+    session.phase = 'ACTIVE_GAME';
+    session.round = 1;
 
-    fullDeck = createDeck();
-    gameState.phase = 'PREFLOP';
-    gameState.winner = null;
+    deck = createDeck();
     gameState.communityCards = [];
+    gameState.roundEliminatedCount = 0;
+    gameState.players = session.presentPlayers.map(name => ({
+      name,
+      active: true,
+      eliminated: false,
+      rank: null,
+      points: 0,
+      totalPoints: 0,
+      cards: []
+    }));
 
-    const cardsPerPlayer = gameState.mode === 'Omaha' ? 4 : 2;
-
-    gameState.players.forEach(player => {
-      player.cards = [];
-      for (let i = 0; i < cardsPerPlayer; i++) {
-        player.cards.push(fullDeck.pop());
-      }
-      io.to(player.id).emit('your_cards', player.cards);
+    // Del ut kort
+    const cardsCount = session.mode === 'Omaha' ? 4 : 2;
+    gameState.players.forEach(p => {
+      p.cards = [deck.pop(), deck.pop()];
+      if (cardsCount === 4) p.cards.push(deck.pop(), deck.pop());
     });
 
+    io.emit('session_update', session);
     io.emit('game_state', gameState);
-    io.emit('players_updated', gameState.players);
   });
 
-  // Neste steg i bordet (Flop -> Turn -> River)
-  socket.on('next_phase', () => {
-    if (gameState.phase === 'PREFLOP') {
-      // Del ut 3 kort (Flop)
-      gameState.communityCards.push(fullDeck.pop(), fullDeck.pop(), fullDeck.pop());
-      gameState.phase = 'FLOP';
-    } else if (gameState.phase === 'FLOP') {
-      // Del ut 4. kort (Turn)
-      gameState.communityCards.push(fullDeck.pop());
-      gameState.phase = 'TURN';
-    } else if (gameState.phase === 'TURN') {
-      // Del ut 5. kort (River)
-      gameState.communityCards.push(fullDeck.pop());
-      gameState.phase = 'RIVER';
+  // Vippebryter (Slå ut / gjeninnsett spiller)
+  socket.on('toggle_player_status', (playerName) => {
+    let player = gameState.players.find(p => p.name === playerName);
+    if (!player) return;
+
+    if (!player.eliminated) {
+      // Slå ut spiller -> tildel laveste ledige plassering
+      player.eliminated = true;
+      player.active = false;
+      const rankAssigned = gameState.players.length - gameState.roundEliminatedCount;
+      player.rank = rankAssigned;
+      gameState.roundEliminatedCount++;
+
+      // Poengskala: 1.plass=10, 2.=6, 3.=2, 4.=1, 5.=0
+      const pointTable = { 1: 10, 2: 6, 3: 2, 4: 1, 5: 0 };
+      player.points = pointTable[rankAssigned] || 0;
+      player.totalPoints += player.points;
+    } else {
+      // Vipp tilbake til grønn (Feilretting)
+      player.eliminated = false;
+      player.active = true;
+      player.totalPoints -= player.points;
+      player.points = 0;
+      player.rank = null;
+      gameState.roundEliminatedCount--;
     }
 
+    // Sjekk om kun 1 spiller står igjen (Siste er vinner)
+    const activePlayers = gameState.players.filter(p => !p.eliminated);
+    if (activePlayers.length === 1) {
+      const winner = activePlayers[0];
+      winner.rank = 1;
+      winner.points = 10;
+      winner.totalPoints += 10;
+      session.phase = 'POST_ROUND';
+    }
+
+    io.emit('session_update', session);
     io.emit('game_state', gameState);
   });
 
-  socket.on('toggle_game_mode', () => {
-    gameState.mode = gameState.mode === "Texas Hold'em" ? 'Omaha' : "Texas Hold'em";
+  // Åpne neste kort på bordet
+  socket.on('next_community_card', () => {
+    if (gameState.communityCards.length === 0) {
+      gameState.communityCards.push(deck.pop(), deck.pop(), deck.pop()); // Flop
+    } else if (gameState.communityCards.length < 5) {
+      gameState.communityCards.push(deck.pop()); // Turn / River
+    }
     io.emit('game_state', gameState);
   });
 
-  socket.on('reset_game', () => {
-    gameState.players = [];
+  // Start neste omgang
+  socket.on('next_round', () => {
+    session.round++;
+    session.phase = 'ACTIVE_GAME';
+    deck = createDeck();
     gameState.communityCards = [];
-    gameState.winner = null;
-    gameState.phase = 'VENTING';
+    gameState.roundEliminatedCount = 0;
+
+    const cardsCount = session.mode === 'Omaha' ? 4 : 2;
+    gameState.players.forEach(p => {
+      p.eliminated = false;
+      p.active = true;
+      p.rank = null;
+      p.points = 0;
+      p.cards = [];
+      for (let i = 0; i < cardsCount; i++) p.cards.push(deck.pop());
+    });
+
+    io.emit('session_update', session);
     io.emit('game_state', gameState);
-    io.emit('players_updated', gameState.players);
+  });
+
+  // Eksporter CSV-data
+  socket.on('export_csv', () => {
+    let csv = "SessionDate,Year,Month,Host,Player,Round,Rank,Points\n";
+    history.forEach(s => {
+      const year = s.date.split('-')[0];
+      const month = s.date.split('-')[1];
+      s.players.forEach(p => {
+        csv += `${s.date},${year},${month},${s.host},${p.name},${s.round},${p.rank || ''},${p.totalPoints}\n`;
+      });
+    });
+    socket.emit('csv_data', csv);
   });
 });
 
