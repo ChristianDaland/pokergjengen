@@ -57,47 +57,37 @@
       display: flex;
       justify-content: center;
       gap: 10px;
-      margin: 15px 0;
+      margin: 20px 0;
     }
 
+    /* Forenklet og tydelig kortdesign for mobil */
     .card {
       display: inline-flex;
       flex-direction: column;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       background-color: #ffffff;
-      border-radius: 8px;
-      width: 75px;
-      height: 110px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border-radius: 10px;
+      width: 78px;
+      height: 115px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       font-weight: bold;
-      position: relative;
-      padding: 5px;
+      padding: 6px;
       user-select: none;
     }
 
     .card.red { color: #d9534f; }
     .card.black { color: #222222; }
 
-    .card-corner {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    .card-val {
+      font-size: 1.8rem;
       line-height: 1;
+      margin-bottom: 4px;
     }
-    .card-corner.top-left { align-self: flex-start; }
-    .card-corner.bottom-right { align-self: flex-end; transform: rotate(180deg); }
 
-    .card-corner .val { font-size: 1rem; font-weight: bold; }
-    .card-corner .suit { font-size: 0.9rem; }
-
-    .card-center-symbol {
-      font-size: 2rem;
+    .card-suit {
+      font-size: 2.2rem;
       line-height: 1;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
     }
 
     .status-badge {
@@ -157,8 +147,6 @@
 
     socket.on('preset_players', (presets) => {
       const select = document.getElementById('player-select');
-      
-      // Tøm eksisterende valg unntatt standard og spesiell innskriving
       select.innerHTML = '<option value="">-- Velg spiller --</option>';
 
       presets.forEach(name => {
@@ -213,6 +201,46 @@
       socket.emit('player_fold');
     }
 
+    // Tallverdi for sortering (A er høyest)
+    const VALUE_MAP = {
+      '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+      'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
+    };
+
+    function sortPlayerCards(cards) {
+      if (!cards || cards.length === 0) return [];
+
+      // Tell forekomster av hver verdi (for å finne par/tre like)
+      const counts = {};
+      cards.forEach(c => {
+        const val = c.slice(0, -1).toUpperCase();
+        counts[val] = (counts[val] || 0) + 1;
+      });
+
+      return [...cards].sort((a, b) => {
+        const valA = a.slice(0, -1).toUpperCase();
+        const valB = b.slice(0, -1).toUpperCase();
+        const suitA = a.slice(-1).toLowerCase();
+        const suitB = b.slice(-1).toLowerCase();
+
+        const countA = counts[valA];
+        const countB = counts[valB];
+
+        // 1. Par / flertall prioriteres først til venstre
+        if (countA !== countB) {
+          return countB - countA;
+        }
+
+        // 2. Høyest verdi prioriteres (f.eks. Ess før Konge)
+        if (VALUE_MAP[valA] !== VALUE_MAP[valB]) {
+          return VALUE_MAP[valB] - VALUE_MAP[valA];
+        }
+
+        // 3. Ved lik verdi sorteres det etter farge for å holde like farger sammen
+        return suitA.localeCompare(suitB);
+      });
+    }
+
     function formatCard(cardCode) {
       if (!cardCode) return '';
       let rawVal = cardCode.slice(0, -1).toUpperCase();
@@ -230,15 +258,8 @@
 
       return `
         <div class="card ${suit.color}">
-          <div class="card-corner top-left">
-            <span class="val">${displayVal}</span>
-            <span class="suit">${suit.symbol}</span>
-          </div>
-          <div class="card-center-symbol">${suit.symbol}</div>
-          <div class="card-corner bottom-right">
-            <span class="val">${displayVal}</span>
-            <span class="suit">${suit.symbol}</span>
-          </div>
+          <div class="card-val">${displayVal}</div>
+          <div class="card-suit">${suit.symbol}</div>
         </div>
       `;
     }
@@ -255,8 +276,10 @@
       const pointsDiv = document.getElementById('player-points');
       pointsDiv.innerText = `Poeng: ${data.points || 0}`;
 
+      // Sorter kortene før de tegnes ut
+      const sortedCards = sortPlayerCards(data.cards || []);
       const cardsDiv = document.getElementById('my-cards');
-      cardsDiv.innerHTML = (data.cards || []).map(c => formatCard(c)).join('');
+      cardsDiv.innerHTML = sortedCards.map(c => formatCard(c)).join('');
 
       const foldBtn = document.getElementById('fold-container');
       const foldedMsg = document.getElementById('folded-msg');
