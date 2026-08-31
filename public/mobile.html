@@ -17,9 +17,90 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+      position: relative;
     }
 
-    h2 { margin-top: 5px; font-size: 1.4rem; }
+    /* Topbar med Hamburgermeny */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 10px;
+      background: #1e1e1e;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    .hamburger-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.8rem;
+      cursor: pointer;
+      padding: 0 5px;
+    }
+
+    /* Sidelagt Meny (Drawer) */
+    .menu-drawer {
+      position: fixed;
+      top: 0;
+      right: -280px;
+      width: 280px;
+      height: 100%;
+      background-color: #1e1e1e;
+      box-shadow: -2px 0 10px rgba(0,0,0,0.7);
+      transition: right 0.3s ease;
+      z-index: 1000;
+      padding: 20px;
+      text-align: left;
+    }
+
+    .menu-drawer.open {
+      right: 0;
+    }
+
+    .menu-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .menu-item {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #2a2a2a;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      text-align: left;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .overlay-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+    }
+    .overlay-backdrop.show { display: block; }
 
     .card-selection {
       background: #1e1e1e;
@@ -53,14 +134,25 @@
     .btn-join { background-color: #2196f3; color: white; }
     .btn-fold { background-color: #f44336; color: white; margin-top: 15px; }
 
+    .cards-wrapper {
+      margin: 15px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .cards-hint {
+      font-size: 0.85rem;
+      color: #aaa;
+      margin-bottom: 8px;
+    }
+
     .cards-container {
       display: flex;
       justify-content: center;
       gap: 10px;
-      margin: 20px 0;
     }
 
-    /* Forenklet og tydelig kortdesign for mobil */
+    /* Kortdesign */
     .card {
       display: inline-flex;
       flex-direction: column;
@@ -73,21 +165,23 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       font-weight: bold;
       padding: 6px;
-      user-select: none;
     }
 
     .card.red { color: #d9534f; }
     .card.black { color: #222222; }
 
-    .card-val {
-      font-size: 1.8rem;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
+    .card-val { font-size: 1.8rem; line-height: 1; margin-bottom: 4px; }
+    .card-suit { font-size: 2.2rem; line-height: 1; }
 
-    .card-suit {
-      font-size: 2.2rem;
-      line-height: 1;
+    /* Kortbaksidestil */
+    .card-back {
+      background: linear-gradient(135deg, #1b5e20 0%, #0d3b11 100%);
+      border: 2px solid #ffffff;
+      color: #ffffff;
+    }
+    .card-back-pattern {
+      font-size: 1.5rem;
+      opacity: 0.4;
     }
 
     .status-badge {
@@ -107,10 +201,44 @@
       font-size: 1.2rem;
       margin-top: 10px;
     }
+
+    /* Modal for statistikk */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 400px;
+      z-index: 1001;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+    }
   </style>
 </head>
 <body>
 
+  <!-- Top Bar med Menyknapp -->
+  <div class="top-bar">
+    <span style="font-weight: bold;">Løland Gård Poker</span>
+    <button class="hamburger-btn" onclick="toggleMenu()">☰</button>
+  </div>
+
+  <!-- Sidelagt Meny (Drawer) -->
+  <div id="backdrop" class="overlay-backdrop" onclick="toggleMenu()"></div>
+  <div id="menu-drawer" class="menu-drawer">
+    <div class="menu-header">
+      <h3 style="margin:0;">Meny</h3>
+      <button class="close-btn" onclick="toggleMenu()">✕</button>
+    </div>
+    <button class="menu-item" onclick="showStats()">📊 Vis Statistikk</button>
+    <button class="menu-item" onclick="location.reload()">🔄 Bytt Navn / Logg ut</button>
+  </div>
+
+  <!-- Innloggingsskjerm -->
   <div id="login-screen" class="card-selection">
     <h2>Velkommen til Pokerbordet</h2>
     <p style="font-size: 0.9rem; color: #aaa;">Velg ditt navn eller skriv inn nytt:</p>
@@ -125,12 +253,17 @@
     <button class="btn btn-join" onclick="joinGame()">Koble til</button>
   </div>
 
+  <!-- Spillskjerm -->
   <div id="game-screen" style="display: none; flex: 1;">
     <h3 id="player-title" style="margin-bottom: 5px;"></h3>
     <div id="player-role"></div>
     <div id="player-points" style="font-size: 0.9rem; color: #ffd700; margin-bottom: 10px;"></div>
 
-    <div id="my-cards" class="cards-container"></div>
+    <!-- Kortområde med trykk-for-å-se logikk -->
+    <div class="cards-wrapper" onclick="toggleShowCards()">
+      <div id="cards-hint" class="cards-hint">👁 Trykk for å se kortene dine</div>
+      <div id="my-cards" class="cards-container"></div>
+    </div>
 
     <div id="fold-container">
       <button class="btn btn-fold" onclick="fold()">Kast kortene (Fold)</button>
@@ -141,9 +274,18 @@
     </div>
   </div>
 
+  <!-- Statistikk Modal -->
+  <div id="stats-modal" class="modal">
+    <h3>Statistikk</h3>
+    <div id="stats-content" style="text-align: left; margin: 15px 0;">Laster statistikk...</div>
+    <button class="btn btn-join" onclick="closeStats()">Lukk</button>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let currentCards = [];
+    let showCards = false;
 
     socket.on('preset_players', (presets) => {
       const select = document.getElementById('player-select');
@@ -161,6 +303,13 @@
       customOpt.innerText = '+ Skriv annet navn...';
       select.appendChild(customOpt);
     });
+
+    function toggleMenu() {
+      const drawer = document.getElementById('menu-drawer');
+      const backdrop = document.getElementById('backdrop');
+      drawer.classList.toggle('open');
+      backdrop.classList.toggle('show');
+    }
 
     function toggleCustomNameInput() {
       const select = document.getElementById('player-select');
@@ -201,7 +350,11 @@
       socket.emit('player_fold');
     }
 
-    // Tallverdi for sortering (A er høyest)
+    function toggleShowCards() {
+      showCards = !showCards;
+      renderCards();
+    }
+
     const VALUE_MAP = {
       '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
       'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
@@ -210,7 +363,6 @@
     function sortPlayerCards(cards) {
       if (!cards || cards.length === 0) return [];
 
-      // Tell forekomster av hver verdi (for å finne par/tre like)
       const counts = {};
       cards.forEach(c => {
         const val = c.slice(0, -1).toUpperCase();
@@ -223,25 +375,21 @@
         const suitA = a.slice(-1).toLowerCase();
         const suitB = b.slice(-1).toLowerCase();
 
-        const countA = counts[valA];
-        const countB = counts[valB];
-
-        // 1. Par / flertall prioriteres først til venstre
-        if (countA !== countB) {
-          return countB - countA;
-        }
-
-        // 2. Høyest verdi prioriteres (f.eks. Ess før Konge)
-        if (VALUE_MAP[valA] !== VALUE_MAP[valB]) {
-          return VALUE_MAP[valB] - VALUE_MAP[valA];
-        }
-
-        // 3. Ved lik verdi sorteres det etter farge for å holde like farger sammen
+        if (counts[valA] !== counts[valB]) return counts[valB] - counts[valA];
+        if (VALUE_MAP[valA] !== VALUE_MAP[valB]) return VALUE_MAP[valB] - VALUE_MAP[valA];
         return suitA.localeCompare(suitB);
       });
     }
 
     function formatCard(cardCode) {
+      if (!showCards) {
+        return `
+          <div class="card card-back">
+            <div class="card-back-pattern">🂠</div>
+          </div>
+        `;
+      }
+
       if (!cardCode) return '';
       let rawVal = cardCode.slice(0, -1).toUpperCase();
       let displayVal = rawVal === 'T' ? '10' : rawVal;
@@ -264,6 +412,15 @@
       `;
     }
 
+    function renderCards() {
+      const hintDiv = document.getElementById('cards-hint');
+      hintDiv.innerText = showCards ? '🙈 Trykk for å skjule kortene' : '👁 Trykk for å se kortene dine';
+
+      const sortedCards = sortPlayerCards(currentCards);
+      const cardsDiv = document.getElementById('my-cards');
+      cardsDiv.innerHTML = sortedCards.map(c => formatCard(c)).join('');
+    }
+
     socket.on('player_state', (data) => {
       const roleDiv = document.getElementById('player-role');
       if (data.role) {
@@ -276,10 +433,8 @@
       const pointsDiv = document.getElementById('player-points');
       pointsDiv.innerText = `Poeng: ${data.points || 0}`;
 
-      // Sorter kortene før de tegnes ut
-      const sortedCards = sortPlayerCards(data.cards || []);
-      const cardsDiv = document.getElementById('my-cards');
-      cardsDiv.innerHTML = sortedCards.map(c => formatCard(c)).join('');
+      currentCards = data.cards || [];
+      renderCards();
 
       const foldBtn = document.getElementById('fold-container');
       const foldedMsg = document.getElementById('folded-msg');
@@ -291,6 +446,28 @@
         foldBtn.style.display = data.phase !== 'VENTING' && data.phase !== 'SHOWDOWN' ? 'block' : 'none';
         foldedMsg.style.display = 'none';
       }
+    });
+
+    function showStats() {
+      toggleMenu();
+      document.getElementById('stats-modal').style.display = 'block';
+      document.getElementById('backdrop').classList.add('show');
+      
+      socket.emit('get_stats');
+    }
+
+    function closeStats() {
+      document.getElementById('stats-modal').style.display = 'none';
+      document.getElementById('backdrop').classList.remove('show');
+    }
+
+    socket.on('stats_data', (stats) => {
+      const content = document.getElementById('stats-content');
+      if (!stats || stats.length === 0) {
+        content.innerText = 'Ingen statistikk registrert ennå.';
+        return;
+      }
+      content.innerHTML = stats.map(s => `<p><b>${s.name}:</b> ${s.wins || 0} seiere</p>`).join('');
     });
   </script>
 </body>
