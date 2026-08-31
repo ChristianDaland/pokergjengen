@@ -58,6 +58,8 @@
       justify-content: center;
       gap: 10px;
       margin: 20px 0;
+      cursor: pointer;
+      min-height: 120px;
     }
 
     /* Forenklet og tydelig kortdesign for mobil */
@@ -74,6 +76,26 @@
       font-weight: bold;
       padding: 6px;
       user-select: none;
+      transition: transform 0.15s ease-in-out;
+    }
+
+    .card:active {
+      transform: scale(0.96);
+    }
+
+    /* Baksiden av kortene */
+    .card.back {
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      border: 3px solid #ffffff;
+      color: transparent;
+      position: relative;
+    }
+    
+    .card.back::after {
+      content: '♠♥♦♣';
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 2px;
     }
 
     .card.red { color: #d9534f; }
@@ -107,6 +129,13 @@
       font-size: 1.2rem;
       margin-top: 10px;
     }
+
+    .tap-hint {
+      font-size: 0.85rem;
+      color: #aaa;
+      margin-top: -10px;
+      margin-bottom: 15px;
+    }
   </style>
 </head>
 <body>
@@ -130,7 +159,8 @@
     <div id="player-role"></div>
     <div id="player-points" style="font-size: 0.9rem; color: #ffd700; margin-bottom: 10px;"></div>
 
-    <div id="my-cards" class="cards-container"></div>
+    <div id="my-cards" class="cards-container" onclick="toggleCardVisibility()"></div>
+    <div id="tap-hint" class="tap-hint" style="display: none;">Trykk på kortene for å vise/skjule</div>
 
     <div id="fold-container">
       <button class="btn btn-fold" onclick="fold()">Kast kortene (Fold)</button>
@@ -144,6 +174,8 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let showCards = false; // Kortene er skjult som standard
+    let currentCards = [];
 
     socket.on('preset_players', (presets) => {
       const select = document.getElementById('player-select');
@@ -201,6 +233,12 @@
       socket.emit('player_fold');
     }
 
+    function toggleCardVisibility() {
+      if (!currentCards || currentCards.length === 0) return;
+      showCards = !showCards;
+      renderCards();
+    }
+
     // Tallverdi for sortering (A er høyest)
     const VALUE_MAP = {
       '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
@@ -210,7 +248,6 @@
     function sortPlayerCards(cards) {
       if (!cards || cards.length === 0) return [];
 
-      // Tell forekomster av hver verdi (for å finne par/tre like)
       const counts = {};
       cards.forEach(c => {
         const val = c.slice(0, -1).toUpperCase();
@@ -226,22 +263,17 @@
         const countA = counts[valA];
         const countB = counts[valB];
 
-        // 1. Par / flertall prioriteres først til venstre
-        if (countA !== countB) {
-          return countB - countA;
-        }
-
-        // 2. Høyest verdi prioriteres (f.eks. Ess før Konge)
-        if (VALUE_MAP[valA] !== VALUE_MAP[valB]) {
-          return VALUE_MAP[valB] - VALUE_MAP[valA];
-        }
-
-        // 3. Ved lik verdi sorteres det etter farge for å holde like farger sammen
+        if (countA !== countB) return countB - countA;
+        if (VALUE_MAP[valA] !== VALUE_MAP[valB]) return VALUE_MAP[valB] - VALUE_MAP[valA];
         return suitA.localeCompare(suitB);
       });
     }
 
     function formatCard(cardCode) {
+      if (!showCards) {
+        return `<div class="card back"></div>`;
+      }
+
       if (!cardCode) return '';
       let rawVal = cardCode.slice(0, -1).toUpperCase();
       let displayVal = rawVal === 'T' ? '10' : rawVal;
@@ -264,6 +296,19 @@
       `;
     }
 
+    function renderCards() {
+      const cardsDiv = document.getElementById('my-cards');
+      const tapHint = document.getElementById('tap-hint');
+      
+      if (currentCards && currentCards.length > 0) {
+        cardsDiv.innerHTML = currentCards.map(c => formatCard(c)).join('');
+        tapHint.style.display = 'block';
+      } else {
+        cardsDiv.innerHTML = '';
+        tapHint.style.display = 'none';
+      }
+    }
+
     socket.on('player_state', (data) => {
       const roleDiv = document.getElementById('player-role');
       if (data.role) {
@@ -276,10 +321,15 @@
       const pointsDiv = document.getElementById('player-points');
       pointsDiv.innerText = `Poeng: ${data.points || 0}`;
 
-      // Sorter kortene før de tegnes ut
-      const sortedCards = sortPlayerCards(data.cards || []);
-      const cardsDiv = document.getElementById('my-cards');
-      cardsDiv.innerHTML = sortedCards.map(c => formatCard(c)).join('');
+      const newSortedCards = sortPlayerCards(data.cards || []);
+      
+      // Tilbakestill til skjult når det deles ut helt nye kort
+      if (JSON.stringify(newSortedCards) !== JSON.stringify(currentCards)) {
+        currentCards = newSortedCards;
+        showCards = false;
+      }
+
+      renderCards();
 
       const foldBtn = document.getElementById('fold-container');
       const foldedMsg = document.getElementById('folded-msg');
