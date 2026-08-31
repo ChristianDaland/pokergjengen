@@ -1,5 +1,5 @@
 /* ==========================================
-   LØLAND GÅRD POKER - MAIN STYLESHEET
+   LØLAND GÅRD POKER - MAIN STYLESHEET (INDEX.HTML)
    ========================================== */
 
 /* Global Stylings & Layout */
@@ -104,7 +104,7 @@ header h1 {
 }
 
 /* ==========================================
-   FELLESKORT (BOARD CARDS) - STORE MED MIDTSYMBOL
+   KORT-DESIGN FOR INDEX.HTML (KUN HJØRNER)
    ========================================== */
 .community-cards {
   display: flex;
@@ -113,54 +113,77 @@ header h1 {
   justify-content: center;
 }
 
+/* Kort for både bord og spillere på index.html */
 .card {
-  width: 65px;
-  height: 95px;
   background-color: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
   position: relative;
   user-select: none;
+}
+
+/* Felleskortene øverst på bordet (litt større enn spillerkortene) */
+.community-cards .card {
+  width: 55px;
+  height: 80px;
+}
+
+/* Spillerkortene nederst */
+.player-cards-container .card {
+  width: 48px;
+  height: 68px;
+}
+
+/* Hjørnevisning for alle kort på index.html */
+.card .card-corner {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 5px;
-}
-
-.card .top-left {
-  font-weight: bold;
-  font-size: 1.1rem;
+  align-items: center;
   line-height: 1;
-  text-align: left;
 }
 
-.card .card-center-symbol {
-  font-size: 2rem;
-  text-align: center;
-  align-self: center;
+.card .card-corner.top-left {
+  position: absolute;
+  top: 4px;
+  left: 4px;
 }
 
-.card .bottom-right {
-  font-weight: bold;
-  font-size: 1.1rem;
-  line-height: 1;
-  text-align: right;
+.card .card-corner.bottom-right {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
   transform: rotate(180deg);
 }
 
-/* Fargevalg for felleskort og spillerkort */
-.card.hearts, .card.diamonds,
-.player-card.hearts, .player-card.diamonds {
+.community-cards .card-value {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.community-cards .card-suit {
+  font-size: 0.95rem;
+}
+
+.player-cards-container .card-value {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.player-cards-container .card-suit {
+  font-size: 0.85rem;
+}
+
+/* Fargehåndtering */
+.card.hearts, .card.diamonds {
   color: #d9534f;
 }
 
-.card.spades, .card.clubs,
-.player-card.spades, .player-card.clubs {
+.card.spades, .card.clubs {
   color: #222222;
 }
 
 /* ==========================================
-   SPILLERKORT (PLAYER HANDS) - KUN HJØRNER
+   SPILLER-BOKSER & GRID
    ========================================== */
 .players-grid {
   display: flex;
@@ -214,45 +237,6 @@ header h1 {
   display: flex;
   gap: 6px;
   justify-content: center;
-}
-
-.player-card {
-  width: 48px;
-  height: 68px;
-  background-color: #ffffff;
-  border-radius: 6px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  position: relative;
-  user-select: none;
-}
-
-.player-card .card-corner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-}
-
-.player-card .card-corner.top-left {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-}
-
-.player-card .card-corner.bottom-right {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  transform: rotate(180deg);
-}
-
-.player-card .card-value {
-  font-size: 1rem;
-  font-weight: bold;
-}
-
-.player-card .card-suit {
-  font-size: 0.85rem;
 }
 
 /* ==========================================

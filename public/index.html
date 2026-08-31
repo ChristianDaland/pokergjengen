@@ -45,12 +45,12 @@
         Modus: OMAHA | Fase: SHOWDOWN
       </div>
 
-      <!-- Felleskort på bordet (Large view with center symbol) -->
+      <!-- Felleskort på bordet -->
       <div class="community-cards" id="communityCardsContainer">
         <!-- Genereres dynamisk fra JS -->
       </div>
 
-      <!-- Spillere på bordet (Compact view with corners only) -->
+      <!-- Spillere på bordet -->
       <div class="players-grid" id="playersGridContainer">
         <!-- Genereres dynamisk fra JS -->
       </div>
@@ -79,12 +79,9 @@
 
 
   <!-- ==========================================
-       JAVASCRIPT CARD RENDER MODULE & GAME LOGIC
+       JAVASCRIPT CARD RENDER MODULE (KUN HJØRNER)
        ========================================== -->
   <script>
-    // -------------------------------------------------------------
-    // HJELPEFUNKSJONER FOR KORT
-    // -------------------------------------------------------------
     function getSuitSymbol(suit) {
       const s = String(suit).toLowerCase();
       if (s.includes('heart') || s === 'h' || s === '♥') return '♥';
@@ -102,18 +99,16 @@
       return 'clubs';
     }
 
-    // -------------------------------------------------------------
-    // SPILLERKORT: Kun hjørner (verdi + symbol)
-    // -------------------------------------------------------------
-    function createPlayerCardHTML(card) {
-      if (!card) return `<div class="player-card card-back"></div>`;
+    // Felles render-funksjon for ALLE kort i index.html (uten midtsymbol)
+    function createCardHTML(card) {
+      if (!card) return `<div class="card card-back"></div>`;
 
       const suitClass = getSuitClass(card.suit);
       const symbol = getSuitSymbol(card.suit);
       const val = card.value || card.rank;
 
       return `
-        <div class="player-card ${suitClass}">
+        <div class="card ${suitClass}">
           <div class="card-corner top-left">
             <span class="card-value">${val}</span>
             <span class="card-suit">${symbol}</span>
@@ -127,26 +122,7 @@
     }
 
     // -------------------------------------------------------------
-    // FELLESKORT (BORDET): Bevares uendret med midtsymbol
-    // -------------------------------------------------------------
-    function createCommunityCardHTML(card) {
-      if (!card) return `<div class="card card-back"></div>`;
-
-      const suitClass = getSuitClass(card.suit);
-      const symbol = getSuitSymbol(card.suit);
-      const val = card.value || card.rank;
-
-      return `
-        <div class="card ${suitClass}">
-          <div class="top-left">${val}${symbol}</div>
-          <div class="card-center-symbol">${symbol}</div>
-          <div class="bottom-right">${val}${symbol}</div>
-        </div>
-      `;
-    }
-
-    // -------------------------------------------------------------
-    // RENDERING AV SPELL-DATA (DEMO / TEST)
+    // RENDERING AV SPILL-DATA
     // -------------------------------------------------------------
     const gameState = {
       communityCards: [
@@ -187,17 +163,17 @@
     };
 
     function renderBoard() {
-      // 1. Render Felleskort
+      // 1. Render Felleskort (bruker den nye rent hjørne-malen)
       const communityContainer = document.getElementById('communityCardsContainer');
       communityContainer.innerHTML = gameState.communityCards
-        .map(card => createCommunityCardHTML(card))
+        .map(card => createCardHTML(card))
         .join('');
 
-      // 2. Render Spillere og deres håndkort
+      // 2. Render Spillere og deres kort (bruker samme hjørne-mal)
       const playersContainer = document.getElementById('playersGridContainer');
       playersContainer.innerHTML = gameState.players.map(player => {
         const playerBadgeClass = player.role === 'Lilleblind' ? 'badge-sb' : 'badge-bb';
-        const cardsHTML = player.cards.map(card => createPlayerCardHTML(card)).join('');
+        const cardsHTML = player.cards.map(card => createCardHTML(card)).join('');
 
         return `
           <div class="player-box">
