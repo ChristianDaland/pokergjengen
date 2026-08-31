@@ -8,9 +8,23 @@
 </head>
 <body>
 
-  <!-- Header -->
+  <!-- Header med Hamburgermeny -->
   <header>
-    <h1>Løland Gård Poker</h1>
+    <div class="header-content">
+      <button class="hamburger-btn" id="hamburgerBtn" aria-label="Meny">
+        ☰
+      </button>
+      <h1>Løland Gård Poker</h1>
+    </div>
+
+    <!-- Dropdown meny -->
+    <nav class="nav-menu" id="navMenu">
+      <ul>
+        <li><a href="#" id="menuNewGame">Start Ny Spillekveld</a></li>
+        <li><a href="board.html" target="_blank">Åpne Bordvisning</a></li>
+        <li><a href="mobile.html" target="_blank">Åpne Mobilvisning</a></li>
+      </ul>
+    </nav>
     
     <!-- Top Controls -->
     <div class="top-controls">
@@ -32,7 +46,7 @@
 
   <!-- Winner Banner -->
   <div class="status-banner" id="winnerText">
-    🏆 VINNER: Odd Christian (To Par, J's & 2's)
+    Venter på spillere...
   </div>
 
   <!-- Main Content Layout -->
@@ -42,18 +56,14 @@
     <div class="poker-table">
       
       <div class="table-header-info" id="gameModeText">
-        Modus: OMAHA | Fase: SHOWDOWN
+        Modus: OMAHA | Fase: VENTING
       </div>
 
       <!-- Felleskort på bordet -->
-      <div class="community-cards" id="communityCardsContainer">
-        <!-- Genereres dynamisk fra JS -->
-      </div>
+      <div class="community-cards" id="communityCardsContainer"></div>
 
       <!-- Spillere på bordet -->
-      <div class="players-grid" id="playersGridContainer">
-        <!-- Genereres dynamisk fra JS -->
-      </div>
+      <div class="players-grid" id="playersGridContainer"></div>
 
     </div>
 
@@ -61,52 +71,60 @@
     <div class="sidebar">
       <div class="qr-box">
         <p><strong>Skann for å bli med:</strong></p>
-        <!-- QR-kode peker nå direkte til mobile.html -->
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pokergjengen.onrender.com/mobile.html" alt="QR Code til mobilvisning">
       </div>
 
-      <button class="btn btn-orange">💻 Åpne Bordvisning</button>
-      <button class="btn btn-blue">Ny Runde</button>
+      <a href="board.html" target="_blank" class="btn btn-orange" style="text-decoration: none;">💻 Åpne Bordvisning</a>
+      <button class="btn btn-blue" id="btnNextRound">Ny Runde</button>
     </div>
 
   </div>
 
   <!-- Bottom Control Bar -->
   <div class="bottom-bar">
-    <button class="btn-small">Spilltype</button>
-    <button class="btn-small">Start Ny Hånd</button>
-    <button class="btn-small">📖 Spilleveiledning</button>
+    <button class="btn-small" id="btnGameType">Spilltype</button>
+    <button class="btn-small" id="btnStartHand">Start Ny Hånd</button>
+    <button class="btn-small" id="btnGuide">📖 Spilleveiledning</button>
   </div>
 
-
   <!-- ==========================================
-       JAVASCRIPT CARD RENDER MODULE (KUN HJØRNER)
+       JAVASCRIPT CARD RENDER MODULE & SYNC
        ========================================== -->
   <script>
+    // 1. Hamburgermeny toggle
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const navMenu = document.getElementById('navMenu');
+
+    if (hamburgerBtn && navMenu) {
+      hamburgerBtn.addEventListener('click', () => {
+        navMenu.classList.toggle('open');
+      });
+    }
+
+    // 2. Kortrendering (Rent hjørnedesign for index.html)
     function getSuitSymbol(suit) {
-      const s = String(suit).toLowerCase();
+      const s = String(suit || '').toLowerCase();
       if (s.includes('heart') || s === 'h' || s === '♥') return '♥';
       if (s.includes('diamond') || s === 'd' || s === '♦') return '♦';
       if (s.includes('spade') || s === 's' || s === '♠') return '♠';
       if (s.includes('club') || s === 'c' || s === '♣') return '♣';
-      return suit;
+      return suit || '';
     }
 
     function getSuitClass(suit) {
-      const s = String(suit).toLowerCase();
+      const s = String(suit || '').toLowerCase();
       if (s.includes('heart') || s === 'h' || s === '♥') return 'hearts';
       if (s.includes('diamond') || s === 'd' || s === '♦') return 'diamonds';
       if (s.includes('spade') || s === 's' || s === '♠') return 'spades';
       return 'clubs';
     }
 
-    // Felles render-funksjon for ALLE kort i index.html (uten midtsymbol)
     function createCardHTML(card) {
       if (!card) return `<div class="card card-back"></div>`;
 
       const suitClass = getSuitClass(card.suit);
       const symbol = getSuitSymbol(card.suit);
-      const val = card.value || card.rank;
+      const val = card.value || card.rank || '';
 
       return `
         <div class="card ${suitClass}">
@@ -122,80 +140,56 @@
       `;
     }
 
-    // -------------------------------------------------------------
-    // RENDERING AV SPILL-DATA
-    // -------------------------------------------------------------
-    const gameState = {
-      communityCards: [
-        { value: '2', suit: 'spades' },
-        { value: '3', suit: 'hearts' },
-        { value: 'J', suit: 'diamonds' },
-        { value: '5', suit: 'hearts' },
-        { value: '2', suit: 'hearts' }
-      ],
-      players: [
-        {
-          name: 'Odd Christian',
-          place: 1,
-          points: 4,
-          role: 'Lilleblind',
-          status: 'INNE',
-          cards: [
-            { value: '6', suit: 'spades' },
-            { value: 'J', suit: 'clubs' },
-            { value: '7', suit: 'hearts' },
-            { value: 'A', suit: 'spades' }
-          ]
-        },
-        {
-          name: 'Einar',
-          place: 2,
-          points: 0,
-          role: 'Storeblind',
-          status: 'INNE',
-          cards: [
-            { value: 'K', suit: 'diamonds' },
-            { value: '10', suit: 'spades' },
-            { value: '3', suit: 'clubs' },
-            { value: '5', suit: 'clubs' }
-          ]
-        }
-      ]
-    };
+    // 3. Render-funksjon som kalles når spilltilstand oppdateres fra serveren/Firebase
+    function renderGameData(state) {
+      if (!state) return;
 
-    function renderBoard() {
-      // 1. Render Felleskort
+      // Oppdater status/vinner
+      const winnerBanner = document.getElementById('winnerText');
+      if (winnerBanner && state.winnerText) {
+        winnerBanner.textContent = state.winnerText;
+      }
+
+      // Oppdater Modus & Fase
+      const modeText = document.getElementById('gameModeText');
+      if (modeText) {
+        modeText.textContent = `Modus: ${state.mode || 'OMAHA'} | Fase: ${state.phase || 'VENTING'}`;
+      }
+
+      // Render Felleskort
       const communityContainer = document.getElementById('communityCardsContainer');
-      communityContainer.innerHTML = gameState.communityCards
-        .map(card => createCardHTML(card))
-        .join('');
+      if (communityContainer && Array.isArray(state.communityCards)) {
+        communityContainer.innerHTML = state.communityCards
+          .map(card => createCardHTML(card))
+          .join('');
+      }
 
-      // 2. Render Spillere og deres kort
+      // Render Spillere
       const playersContainer = document.getElementById('playersGridContainer');
-      playersContainer.innerHTML = gameState.players.map(player => {
-        const playerBadgeClass = player.role === 'Lilleblind' ? 'badge-sb' : 'badge-bb';
-        const cardsHTML = player.cards.map(card => createCardHTML(card)).join('');
-
-        return `
-          <div class="player-box">
-            <div class="player-info">
-              <div class="player-name">${player.name}</div>
-              <div class="player-meta">Plass ${player.place} | Poeng: ${player.points}</div>
-              <span class="player-badge ${playerBadgeClass}">${player.role}</span>
-              <div class="player-meta" style="color: #4caf50; font-weight: bold; margin-top: 4px;">
-                🟢 ${player.status}
+      if (playersContainer && Array.isArray(state.players)) {
+        playersContainer.innerHTML = state.players.map(player => {
+          const cardsHTML = (player.cards || []).map(card => createCardHTML(card)).join('');
+          return `
+            <div class="player-box">
+              <div class="player-info">
+                <div class="player-name">${player.name || 'Ukjent'}</div>
+                <div class="player-meta">Plass ${player.place || '-'} | Poeng: ${player.points || 0}</div>
+                ${player.role ? `<span class="player-badge">${player.role}</span>` : ''}
+                <div class="player-meta" style="color: #4caf50; font-weight: bold; margin-top: 4px;">
+                  🟢 ${player.status || 'AKTIV'}
+                </div>
+              </div>
+              <div class="player-cards-container">
+                ${cardsHTML}
               </div>
             </div>
-            <div class="player-cards-container">
-              ${cardsHTML}
-            </div>
-          </div>
-        `;
-      }).join('');
+          `;
+        }).join('');
+      }
     }
 
-    // Kjør rendering når siden laster
-    document.addEventListener('DOMContentLoaded', renderBoard);
+    // Global eksponering slik at hovedappen din (socket.js / firebase.js) kan kalle denne
+    window.updatePokerBoard = renderGameData;
   </script>
 </body>
 </html>
