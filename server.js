@@ -85,7 +85,7 @@ function shuffle(array) {
 }
 
 function translateHandDescription(descr) {
-  let text = descr;
+  let text = descr || 'Ukjent hånd';
   text = text.replace(/\bT\b/g, '10');
   text = text.replace(/Straight Flush/g, 'Straight Flush');
   text = text.replace(/Four of a Kind/g, 'Fire like');
@@ -109,19 +109,19 @@ function calculateHandScore(solvedHand) {
   if (!solvedHand) return 0;
 
   // Hovedkategori (0-9) vektes høyest (f.eks. 9 * 10 000 000)
-  let rank = solvedHand.rank || 0;
+  let rank = Number(solvedHand.rank) || 0;
   let score = rank * 10000000;
 
   // pokersolver returnerer 'values' i synkende rekkefølge
   if (solvedHand.values && Array.isArray(solvedHand.values)) {
     let multiplier = 100000;
     for (let val of solvedHand.values) {
-      score += Number(val) * multiplier;
+      score += (Number(val) || 0) * multiplier;
       multiplier = Math.floor(multiplier / 15);
     }
   }
 
-  return score;
+  return Math.floor(score);
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
@@ -381,9 +381,9 @@ io.on('connection', (socket) => {
         const topWinner = winners[0] || solvedHands[0];
         const rawDescr = topWinner && topWinner.solved ? topWinner.solved.descr : 'Ukjent hånd';
         const translatedHand = translateHandDescription(rawDescr);
-        const handRank = topWinner && topWinner.solved ? (topWinner.solved.rank || 0) : 0;
         
-        // Beregn poengsum som vanlig tall
+        // Trygg henting og konvertering av tallverdier
+        const handRank = (topWinner && topWinner.solved && topWinner.solved.rank) ? Number(topWinner.solved.rank) : 0;
         const handScore = topWinner && topWinner.solved ? calculateHandScore(topWinner.solved) : 0;
 
         gameState.winnerInfo = {
@@ -392,11 +392,13 @@ io.on('connection', (socket) => {
           foldedWin: false
         };
 
-        // Sett inn i databasen
-        await pool.query(
-          'INSERT INTO hand_history (player, hand, hand_rank, hand_score, game_mode) VALUES ($1, $2, $3, $4, $5)',
-          [winnerText, translatedHand, handRank, handScore, gameState.gameMode]
+        // Lagre i databasen og skriv ut status i loggen
+        const insertRes = await pool.query(
+          'INSERT INTO hand_history (player, hand, hand_rank, hand_score, game_mode) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+          [winnerText, translatedHand, handRank, handScore, gameState.gameMode || 'TEXAS']
         );
+        console.log(`[DB] Ny hånd registrert i historikk! ID: ${insertRes.rows[0].id}, Vinner: ${winnerText}, Poeng: ${handScore}`);
+
       } catch (err) {
         console.error("Feil under evaluering av SHOWDOWN / DB-lagring:", err);
       }
@@ -423,22 +425,23 @@ io.on('connection', (socket) => {
   });
 
   socket.on('get_top10', async (data) => {
-    const period = data ? data.period : 'tonight';
+    const rawPeriod = (data && data.period) ? String(data.period).toLowerCase() : 'tonight';
     let timeQuery = '';
 
-    // Robust filtrering basert på periode
-    if (period === 'tonight') {
+    // Tilpasset støtte for alle mulige strenger fra frontend
+    if (rawPeriod === 'tonight' || rawPeriod === 'kveld' || rawPeriod === 'kveldens') {
       timeQuery = "WHERE created_at >= NOW() - INTERVAL '24 hours'";
-    } else if (period === 'month') {
+    } else if (rawPeriod === 'month' || rawPeriod === 'måned' || rawPeriod === 'månedens') {
       timeQuery = "WHERE created_at >= NOW() - INTERVAL '30 days'";
-    } else if (period === 'year') {
+    } else if (rawPeriod === 'year' || rawPeriod === 'år' || rawPeriod === 'årets') {
       timeQuery = "WHERE created_at >= NOW() - INTERVAL '1 year'";
-    } else if (period === 'all' || period === 'ever') {
-      timeQuery = ""; // Ingen tidsfiltrering for Evig (All-Time)
+    } else if (rawPeriod === 'all' || rawPeriod === 'ever' || rawPeriod === 'evig') {
+      timeQuery = ""; // Henter alt
+    } else {
+      timeQuery = ""; // Default fallback: Hent alt dersom periode-nøkkelen er ukjent
     }
 
     try {
-      // Sortering basert på hand_score
       const res = await pool.query(`
         SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
         FROM hand_history 
