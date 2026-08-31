@@ -25,6 +25,7 @@ async function initDB() {
         player VARCHAR(100),
         hand VARCHAR(100),
         hand_rank INT DEFAULT 0,
+        hand_score BIGINT DEFAULT 0,
         game_mode VARCHAR(20),
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
@@ -32,6 +33,7 @@ async function initDB() {
     
     await pool.query(`
       ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS hand_rank INT DEFAULT 0;
+      ALTER TABLE hand_history ADD COLUMN IF NOT EXISTS hand_score BIGINT DEFAULT 0;
     `);
 
     // 2. Tabell for dynamisk spillerliste
@@ -42,7 +44,6 @@ async function initDB() {
       );
     `);
 
-    // Fyll inn standardspillere dersom tabellen er helt tom
     const countRes = await pool.query('SELECT COUNT(*) FROM players');
     if (parseInt(countRes.rows[0].count, 10) === 0) {
       for (const name of DEFAULT_PLAYERS) {
@@ -101,6 +102,26 @@ function translateHandDescription(descr) {
   text = text.replace(/Diamonds/g, 'Ruter');
   text = text.replace(/Clubs/g, 'Kløver');
   return text;
+}
+
+// Genererer en unikk matematisk score basert på kortverdiene i den løste hånden
+function calculateHandScore(solvedHand) {
+  if (!solvedHand) return 0;
+  
+  // Hovedrangering (0-9) multipliseres med en stor faktormengde
+  let baseRank = solvedHand.rank || 0;
+  let score = BigInt(baseRank) * BigInt(10000000000);
+
+  // pokersolver setter 'values' som numeriske verdier (2-14) sortert etter viktighet
+  if (solvedHand.values && Array.isArray(solvedHand.values)) {
+    let multiplier = BigInt(100000000);
+    for (let val of solvedHand.values) {
+      score += BigInt(val) * multiplier;
+      multiplier /= BigInt(15);
+    }
+  }
+
+  return score.toString();
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
@@ -216,12 +237,10 @@ async function sendPresetPlayers(targetSocket = null) {
   }
 }
 
-// Hjelpefunksjon for å tvinge tidsvisning til norsk tid
 function formatToNorwegianTime(dateInput) {
   if (!dateInput) return '';
   const d = new Date(dateInput);
   
-  // Tvinger formatteringen til Europe/Oslo (Norge) uavhengig av hvor serveren står
   const options = {
     timeZone: 'Europe/Oslo',
     year: 'numeric',
@@ -358,6 +377,7 @@ io.on('connection', (socket) => {
       const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
       const translatedHand = translateHandDescription(rawDescr);
       const handRank = winners[0] && winners[0].solved ? (winners[0].solved.rank || 0) : 0;
+      const handScore = winners[0] && winners[0].solved ? calculateHandScore(winners[0].solved) : '0';
 
       gameState.winnerInfo = {
         winnerName: winnerText,
@@ -367,8 +387,8 @@ io.on('connection', (socket) => {
 
       try {
         await pool.query(
-          'INSERT INTO hand_history (player, hand, hand_rank, game_mode) VALUES ($1, $2, $3, $4)',
-          [winnerText, translatedHand, handRank, gameState.gameMode]
+          'INSERT INTO hand_history (player, hand, hand_rank, hand_score, game_mode) VALUES ($1, $2, $3, $4, $5)',
+          [winnerText, translatedHand, handRank, handScore, gameState.gameMode]
         );
       } catch (dbErr) {
         console.error("Feil ved lagring av vinnerhånd til DB:", dbErr);
@@ -407,11 +427,12 @@ io.on('connection', (socket) => {
     }
 
     try {
+      // Sorterer nå først på hand_rank DESC, deretter den eksakte hand_score DESC, og til slutt id DESC
       const res = await pool.query(`
         SELECT player AS "playerName", hand AS "handDescr", created_at AS "rawDate"
         FROM hand_history 
         ${timeQuery}
-        ORDER BY hand_rank DESC, id DESC 
+        ORDER BY hand_rank DESC, hand_score DESC, id DESC 
         LIMIT 10
       `);
 
