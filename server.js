@@ -105,7 +105,7 @@ let gameState = {
 let players = {};
 const disconnectTimeouts = {};
 
-// Hjælpefunksjon for å stokke om rekkefølgen på spillerne i `players`-objektet
+// Hjelpefunksjon for å stokke om rekkefølgen på spillerne i `players`-objektet
 function randomizePlayerSeats() {
   const playerArray = Object.values(players);
   if (playerArray.length <= 1) return;
@@ -156,6 +156,24 @@ function startNewHandLogic() {
 }
 
 io.on('connection', (socket) => {
+
+  /* --- NYE EVENTS FOR MOBIL OG DASBOARD INTEGRASJON --- */
+  socket.on('playerJoined', (data) => {
+    // Videreformidle at en spiller har valgt navnet sitt på mobilen
+    io.emit('playerJoined', data);
+  });
+
+  socket.on('cardsScanned', (data) => {
+    // Videreformidle at en spiller har skannet/skrevet inn sine kort fra mobilen
+    io.emit('cardsScanned', data);
+  });
+
+  socket.on('startSession', (sessionData) => {
+    // Videreformidle at verten har startet spillekvelden
+    io.emit('sessionStarted', sessionData);
+  });
+
+  /* --- EKSISTERENDE KORT- OG SPILLELOGIKK --- */
   socket.on('join_game', (name) => {
     const cleanName = name ? name.trim() : 'Spiller';
     
