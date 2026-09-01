@@ -1,347 +1,96 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spillerskjerm - Løland Gård Poker</title>
-  <style>
-    * { box-sizing: border-box; }
-
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: white;
-      text-align: center;
-      margin: 0;
-      padding: 15px;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
-    h2 { margin-top: 5px; font-size: 1.4rem; }
-
-    .card-selection {
-      background: #1e1e1e;
-      padding: 15px;
-      border-radius: 12px;
-      margin-bottom: 15px;
-    }
-
-    select, input {
-      width: 100%;
-      padding: 12px;
-      margin: 8px 0;
-      border-radius: 8px;
-      border: 1px solid #444;
-      background: #2a2a2a;
-      color: white;
-      font-size: 1rem;
-    }
-
-    .btn {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 5px;
-    }
-
-    .btn-join { background-color: #2196f3; color: white; }
-    .btn-fold { background-color: #f44336; color: white; margin-top: 15px; }
-
-    .cards-container {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin: 20px 0;
-      cursor: pointer;
-      min-height: 120px;
-    }
-
-    /* Forenklet og tydelig kortdesign for mobil */
-    .card {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #ffffff;
-      border-radius: 10px;
-      width: 78px;
-      height: 115px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-      font-weight: bold;
-      padding: 6px;
-      user-select: none;
-      transition: transform 0.15s ease-in-out;
-    }
-
-    .card:active {
-      transform: scale(0.96);
-    }
-
-    /* Baksiden av kortene */
-    .card.back {
-      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-      border: 3px solid #ffffff;
-      color: transparent;
-      position: relative;
-    }
-    
-    .card.back::after {
-      content: '♠♥♦♣';
-      font-size: 0.9rem;
-      color: rgba(255, 255, 255, 0.3);
-      letter-spacing: 2px;
-    }
-
-    .card.red { color: #d9534f; }
-    .card.black { color: #222222; }
-
-    .card-val {
-      font-size: 1.8rem;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-
-    .card-suit {
-      font-size: 2.2rem;
-      line-height: 1;
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.9rem;
-      font-weight: bold;
-      margin-bottom: 10px;
-    }
-    .role-dealer { background-color: #ff9800; color: white; }
-    .role-blind { background-color: #9c27b0; color: white; }
-
-    .folded-overlay {
-      color: #f44336;
-      font-weight: bold;
-      font-size: 1.2rem;
-      margin-top: 10px;
-    }
-
-    .tap-hint {
-      font-size: 0.85rem;
-      color: #aaa;
-      margin-top: -10px;
-      margin-bottom: 15px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hybrid Poker - Mobil Spiller</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #121212; color: #fff; text-align: center; margin: 0; padding: 15px; }
+        .card-container { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
+        .card { width: 70px; height: 100px; border: 2px solid #fff; border-radius: 6px; background: #fff; color: #000; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; user-select: none; }
+        .card.hidden { background: #444; color: #444; border-color: #666; }
+        .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; }
+        .btn-fold { background-color: #dc3545; color: white; }
+        .btn-join { background-color: #0d6efd; color: white; }
+        .btn-toggle { background-color: #6c757d; color: white; }
+        input[type="text"] { width: 100%; padding: 12px; font-size: 16px; margin-bottom: 10px; box-sizing: border-box; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; }
+    </style>
 </head>
 <body>
 
-  <div id="login-screen" class="card-selection">
-    <h2>Velkommen til Pokerbordet</h2>
-    <p style="font-size: 0.9rem; color: #aaa;">Velg ditt navn eller skriv inn nytt:</p>
-    
-    <select id="player-select" onchange="toggleCustomNameInput()">
-      <option value="">-- Velg spiller --</option>
-      <option value="CUSTOM">+ Skriv annet navn...</option>
-    </select>
+    <h2>Mobil Pokerklient</h2>
 
-    <input type="text" id="custom-name" placeholder="Skriv navnet ditt her..." style="display: none;">
-
-    <button class="btn btn-join" onclick="joinGame()">Koble til</button>
-  </div>
-
-  <div id="game-screen" style="display: none; flex: 1;">
-    <h3 id="player-title" style="margin-bottom: 5px;"></h3>
-    <div id="player-role"></div>
-    <div id="player-points" style="font-size: 0.9rem; color: #ffd700; margin-bottom: 10px;"></div>
-
-    <div id="my-cards" class="cards-container" onclick="toggleCardVisibility()"></div>
-    <div id="tap-hint" class="tap-hint" style="display: none;">Trykk på kortene for å vise/skjule</div>
-
-    <div id="fold-container">
-      <button class="btn btn-fold" onclick="fold()">Kast kortene (Fold)</button>
+    <div id="joinSection">
+        <input type="text" id="playerName" placeholder="Skriv inn ditt navn">
+        <button class="btn btn-join" onclick="joinGame()">Bli med i spillet</button>
     </div>
 
-    <div id="folded-msg" class="folded-overlay" style="display: none;">
-      Du har kastet deg denne runden.
-    </div>
-  </div>
+    <div id="gameSection" style="display: none;">
+        <h3 id="welcomeMsg"></h3>
+        
+        <div>
+            <p>Dine kort:</p>
+            <div class="card-container" id="cardsDisplay"></div>
+            <button class="btn btn-toggle" onclick="toggleCardVisibility()">Vis / Skjul kort</button>
+        </div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
+        <div style="margin-top: 30px;">
+            <button class="btn btn-fold" onclick="confirmFold()">Kast kortene (Fold)</button>
+        </div>
+    </div>
+
+<script>
     const socket = io();
-    let showCards = false; // Kortene er skjult som standard
-    let currentCards = [];
-
-    socket.on('preset_players', (presets) => {
-      const select = document.getElementById('player-select');
-      select.innerHTML = '<option value="">-- Velg spiller --</option>';
-
-      presets.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.innerText = name;
-        select.appendChild(opt);
-      });
-
-      const customOpt = document.createElement('option');
-      customOpt.value = 'CUSTOM';
-      customOpt.innerText = '+ Skriv annet navn...';
-      select.appendChild(customOpt);
-    });
-
-    function toggleCustomNameInput() {
-      const select = document.getElementById('player-select');
-      const customInput = document.getElementById('custom-name');
-      
-      if (select.value === 'CUSTOM') {
-        customInput.style.display = 'block';
-        customInput.focus();
-      } else {
-        customInput.style.display = 'none';
-      }
-    }
+    let showCards = false;
+    let myCards = [];
 
     function joinGame() {
-      const select = document.getElementById('player-select');
-      const customInput = document.getElementById('custom-name');
-      let playerName = '';
-
-      if (select.value === 'CUSTOM') {
-        playerName = customInput.value.trim();
-      } else {
-        playerName = select.value;
-      }
-
-      if (!playerName) {
-        alert('Vennligst velg eller skriv inn et navn');
-        return;
-      }
-
-      socket.emit('join_game', playerName);
-
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('game-screen').style.display = 'block';
-      document.getElementById('player-title').innerText = playerName;
-    }
-
-    function fold() {
-      socket.emit('player_fold');
+        const name = document.getElementById('playerName').value;
+        if (name.trim() !== '') {
+            socket.emit('join_game', { name: name.trim() });
+            document.getElementById('joinSection').style.display = 'none';
+            document.getElementById('gameSection').style.display = 'block';
+            document.getElementById('welcomeMsg').innerText = `Spiller som: ${name}`;
+        }
     }
 
     function toggleCardVisibility() {
-      if (!currentCards || currentCards.length === 0) return;
-      showCards = !showCards;
-      renderCards();
-    }
-
-    // Tallverdi for sortering (A er høyest)
-    const VALUE_MAP = {
-      '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-      'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
-    };
-
-    function sortPlayerCards(cards) {
-      if (!cards || cards.length === 0) return [];
-
-      const counts = {};
-      cards.forEach(c => {
-        const val = c.slice(0, -1).toUpperCase();
-        counts[val] = (counts[val] || 0) + 1;
-      });
-
-      return [...cards].sort((a, b) => {
-        const valA = a.slice(0, -1).toUpperCase();
-        const valB = b.slice(0, -1).toUpperCase();
-        const suitA = a.slice(-1).toLowerCase();
-        const suitB = b.slice(-1).toLowerCase();
-
-        const countA = counts[valA];
-        const countB = counts[valB];
-
-        if (countA !== countB) return countB - countA;
-        if (VALUE_MAP[valA] !== VALUE_MAP[valB]) return VALUE_MAP[valB] - VALUE_MAP[valA];
-        return suitA.localeCompare(suitB);
-      });
-    }
-
-    function formatCard(cardCode) {
-      if (!showCards) {
-        return `<div class="card back"></div>`;
-      }
-
-      if (!cardCode) return '';
-      let rawVal = cardCode.slice(0, -1).toUpperCase();
-      let displayVal = rawVal === 'T' ? '10' : rawVal;
-      const suitChar = cardCode.slice(-1).toLowerCase();
-      
-      const suits = {
-        'h': { symbol: '♥', color: 'red' },
-        'd': { symbol: '♦', color: 'red' },
-        'c': { symbol: '♣', color: 'black' },
-        's': { symbol: '♠', color: 'black' }
-      };
-      
-      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
-
-      return `
-        <div class="card ${suit.color}">
-          <div class="card-val">${displayVal}</div>
-          <div class="card-suit">${suit.symbol}</div>
-        </div>
-      `;
+        showCards = !showCards;
+        renderCards();
     }
 
     function renderCards() {
-      const cardsDiv = document.getElementById('my-cards');
-      const tapHint = document.getElementById('tap-hint');
-      
-      if (currentCards && currentCards.length > 0) {
-        cardsDiv.innerHTML = currentCards.map(c => formatCard(c)).join('');
-        tapHint.style.display = 'block';
-      } else {
-        cardsDiv.innerHTML = '';
-        tapHint.style.display = 'none';
-      }
+        const container = document.getElementById('cardsDisplay');
+        container.innerHTML = '';
+
+        if (myCards.length === 0) {
+            container.innerHTML = '<p style="color:#888;">Ingen kort utdelt enda.</p>';
+            return;
+        }
+
+        myCards.forEach(c => {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = `card ${showCards ? '' : 'hidden'}`;
+            cardDiv.innerText = showCards ? `${c.value}${c.suit}` : '?';
+            container.appendChild(cardDiv);
+        });
     }
 
-    socket.on('player_state', (data) => {
-      const roleDiv = document.getElementById('player-role');
-      if (data.role) {
-        let badgeClass = data.role === 'Dealer' ? 'role-dealer' : 'role-blind';
-        roleDiv.innerHTML = `<span class="status-badge ${badgeClass}">${data.role}</span>`;
-      } else {
-        roleDiv.innerHTML = '';
-      }
+    function confirmFold() {
+        if (confirm("Er du sikker på at du vil kaste kortene dine?")) {
+            socket.emit('player_fold');
+            alert("Du har kastet kortene.");
+        }
+    }
 
-      const pointsDiv = document.getElementById('player-points');
-      pointsDiv.innerText = `Poeng: ${data.points || 0}`;
-
-      const newSortedCards = sortPlayerCards(data.cards || []);
-      
-      // Tilbakestill til skjult når det deles ut helt nye kort
-      if (JSON.stringify(newSortedCards) !== JSON.stringify(currentCards)) {
-        currentCards = newSortedCards;
-        showCards = false;
-      }
-
-      renderCards();
-
-      const foldBtn = document.getElementById('fold-container');
-      const foldedMsg = document.getElementById('folded-msg');
-
-      if (data.folded) {
-        foldBtn.style.display = 'none';
-        foldedMsg.style.display = 'block';
-      } else {
-        foldBtn.style.display = data.phase !== 'VENTING' && data.phase !== 'SHOWDOWN' ? 'block' : 'none';
-        foldedMsg.style.display = 'none';
-      }
+    socket.on('state_update', (state) => {
+        const me = state.players.find(p => p.id === socket.id);
+        if (me) {
+            myCards = me.cards || [];
+            renderCards();
+        }
     });
-  </script>
+</script>
 </body>
 </html>
