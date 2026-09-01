@@ -16,6 +16,57 @@
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* HAMBURGER SIDE-MENU */
+    .menu-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      z-index: 2000;
+    }
+
+    .side-menu {
+      position: fixed;
+      top: 0;
+      left: -280px;
+      width: 280px;
+      height: 100%;
+      background: #111;
+      padding: 20px;
+      transition: left 0.3s ease;
+      z-index: 2001;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+    }
+
+    .side-menu.active {
+      left: 0;
+    }
+
+    .side-menu h2 {
+      font-size: 20px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 10px;
+    }
+
+    .side-menu ul {
+      list-style: none;
+    }
+
+    .side-menu li {
+      padding: 12px 0;
+      border-bottom: 1px solid #222;
+      cursor: pointer;
+    }
+
+    .side-menu li:hover {
+      color: #2ecc71;
     }
 
     /* TOP HEADER */
@@ -29,8 +80,9 @@
     }
 
     .hamburger-icon {
-      font-size: 24px;
+      font-size: 26px;
       cursor: pointer;
+      user-select: none;
     }
 
     .main-title {
@@ -58,7 +110,7 @@
       padding: 2px 6px;
     }
 
-    /* CONNECTED PLAYERS BANNER */
+    /* BANNER */
     .connected-banner {
       background: #ff7b54;
       color: white;
@@ -73,7 +125,7 @@
       box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
 
-    /* MAIN POKER BOARD CONTAINER */
+    /* MAIN POKER BOARD */
     .game-container {
       display: flex;
       gap: 20px;
@@ -88,7 +140,7 @@
       border: 6px solid #8b4513;
       border-radius: 40px;
       width: 650px;
-      min-height: 320px;
+      min-height: 340px;
       box-shadow: inset 0 0 20px rgba(0,0,0,0.6), 0 8px 16px rgba(0,0,0,0.4);
       padding: 20px;
       display: flex;
@@ -107,49 +159,60 @@
 
     .players-list {
       display: flex;
-      gap: 20px;
+      gap: 15px;
       justify-content: center;
       width: 100%;
+      flex-wrap: wrap;
       margin-bottom: 15px;
     }
 
     .player-card {
       background: #111;
       border-radius: 12px;
-      padding: 15px;
-      width: 160px;
+      padding: 12px;
+      width: 180px;
       text-align: center;
       box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    }
+
+    .player-card.winner {
+      border: 2px solid #f1c40f;
+      box-shadow: 0 0 12px #f1c40f;
     }
 
     .player-card .name {
       font-weight: bold;
       font-size: 16px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     .player-card .info {
       font-size: 12px;
       color: #ccc;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
-    .player-card .status-dot {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      background: #2ecc71;
-      border-radius: 50%;
-      margin-right: 4px;
+    /* SHOWDOWN CARDS */
+    .showdown-cards {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      margin-top: 8px;
     }
 
-    .player-card .status-tag {
-      font-size: 12px;
-      color: #2ecc71;
+    .mini-card {
+      background: white;
+      color: black;
+      border-radius: 4px;
+      padding: 4px 6px;
       font-weight: bold;
+      font-size: 13px;
+      border: 1px solid #888;
     }
 
-    /* WINNER BANNER AT SHOWDOWN */
+    .mini-card.red { color: #d63031; }
+
+    /* WINNER BANNER */
     .winner-banner {
       background: #d35400;
       border: 2px solid #f39c12;
@@ -173,7 +236,7 @@
       color: #f1c40f;
     }
 
-    /* RIGHT SIDEBAR (QR & MAIN ACTIONS) */
+    /* RIGHT SIDEBAR */
     .sidebar-right {
       display: flex;
       flex-direction: column;
@@ -256,9 +319,20 @@
 </head>
 <body>
 
+  <!-- SIDE MENU (HAMBURGER) -->
+  <div class="menu-overlay" id="menuOverlay"></div>
+  <div class="side-menu" id="sideMenu">
+    <h2>Meny</h2>
+    <ul>
+      <li onclick="socket.emit('reset_game')">Nullstill Spill</li>
+      <li onclick="window.open('/board.html', '_blank')">Åpne Bordvisning</li>
+      <li onclick="toggleMenu()">Lukk Meny</li>
+    </ul>
+  </div>
+
   <!-- TOP BAR -->
   <div class="top-bar">
-    <div class="hamburger-icon">☰</div>
+    <div class="hamburger-icon" id="hamburgerBtn">☰</div>
     <div class="main-title">Løland Gård Poker</div>
     <div class="host-badge">
       <span>🍿 Vert:</span>
@@ -312,7 +386,20 @@
   <script>
     const socket = io();
 
-    // Generer QR-kode
+    // Hamburgermeny logikk
+    const sideMenu = document.getElementById('sideMenu');
+    const menuOverlay = document.getElementById('menuOverlay');
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+
+    function toggleMenu() {
+      const active = sideMenu.classList.toggle('active');
+      menuOverlay.style.display = active ? 'block' : 'none';
+    }
+
+    hamburgerBtn.addEventListener('click', toggleMenu);
+    menuOverlay.addEventListener('click', toggleMenu);
+
+    // QR-kode
     new QRCode(document.getElementById("qrcode"), {
       text: window.location.origin + "/mobile.html",
       width: 140,
@@ -320,21 +407,17 @@
     });
 
     // Knappeevents
-    document.getElementById('btnTexas').addEventListener('click', () => {
-      socket.emit('set_game_mode', 'TEXAS');
-    });
+    document.getElementById('btnTexas').addEventListener('click', () => socket.emit('set_game_mode', 'TEXAS'));
+    document.getElementById('btnOmaha').addEventListener('click', () => socket.emit('set_game_mode', 'OMAHA'));
+    document.getElementById('btnStartHand').addEventListener('click', () => socket.emit('start_new_hand'));
+    document.getElementById('btnNextPhase').addEventListener('click', () => socket.emit('next_phase'));
 
-    document.getElementById('btnOmaha').addEventListener('click', () => {
-      socket.emit('set_game_mode', 'OMAHA');
-    });
-
-    document.getElementById('btnStartHand').addEventListener('click', () => {
-      socket.emit('start_new_hand');
-    });
-
-    document.getElementById('btnNextPhase').addEventListener('click', () => {
-      socket.emit('next_phase');
-    });
+    // Hjelpefunksjon for å vise kort-farge
+    function formatCard(card) {
+      if (!card) return '';
+      const isRed = card.includes('♥') || card.includes('♦') || card.includes('H') || card.includes('D');
+      return `<span class="mini-card ${isRed ? 'red' : ''}">${card}</span>`;
+    }
 
     // Oppdatering fra server
     socket.on('state_update', (state) => {
@@ -345,14 +428,20 @@
       const phase = state.phase || 'VENTING';
       document.getElementById('statusText').innerText = `MODUS: ${mode} | FASE: ${phase}`;
 
-      // Spillere
       const playersList = document.getElementById('playersList');
       playersList.innerHTML = '';
 
       if (state.players && state.players.length > 0) {
         state.players.forEach(p => {
+          const isWinner = state.winner && state.winner.name === p.name && phase === 'SHOWDOWN';
           const card = document.createElement('div');
-          card.className = 'player-card';
+          card.className = `player-card ${isWinner ? 'winner' : ''}`;
+
+          let cardsHtml = '';
+          if (phase === 'SHOWDOWN' && p.cards && p.cards.length > 0) {
+            cardsHtml = `<div class="showdown-cards">${p.cards.map(formatCard).join('')}</div>`;
+          }
+
           card.innerHTML = `
             <div class="name">${p.name}</div>
             <div class="info">Plass ${p.seat || 1} | Poeng: ${p.points || 1000}</div>
@@ -360,17 +449,18 @@
               <span class="status-dot"></span>
               <span class="status-tag">INNE</span>
             </div>
+            ${cardsHtml}
           `;
           playersList.appendChild(card);
         });
       }
 
-      // Vinnerhåndtering i Showdown
+      // Vinnerbjelke
       const winnerBanner = document.getElementById('winnerBanner');
       if (phase === 'SHOWDOWN' && state.winner) {
         winnerBanner.style.display = 'block';
-        document.getElementById('winnerTitle').innerText = `Vinner: ${state.winner.name}`;
-        document.getElementById('winnerHand').innerText = state.winner.handDescr || state.winner.hand || '';
+        document.getElementById('winnerTitle').innerText = `🏆 Vinner: ${state.winner.name}`;
+        document.getElementById('winnerHand').innerText = `Beste hånd: ${state.winner.handDescr || state.winner.hand || ''}`;
       } else {
         winnerBanner.style.display = 'none';
       }
