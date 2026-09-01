@@ -3,376 +3,501 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Løland Gård Poker</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="/socket.io/socket.io.js"></script>
+  <title>Løland Gård Poker - Hovedskjerm</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #0f2b1d;
+      color: white;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 15px 25px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      color: #ffd700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .gamenight-info {
+      font-size: 0.95rem;
+      color: #ccc;
+      text-align: right;
+    }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    .panel {
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .mode-selection {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: white;
+      text-align: center;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.1);
+    }
+
+    .btn-mode {
+      flex: 1;
+      background: #334155;
+    }
+
+    .btn-mode.active {
+      background: #2563eb;
+      box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+    }
+
+    .btn-action {
+      background: #16a34a;
+      font-size: 1.1rem;
+    }
+
+    .btn-next {
+      background: #eab308;
+      color: #0f172a;
+    }
+
+    .btn-secondary {
+      background: #475569;
+      font-size: 0.9rem;
+    }
+
+    .poker-table-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 450px;
+      position: relative;
+    }
+
+    .phase-badge {
+      background: #ffd700;
+      color: #000;
+      font-weight: bold;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 1.1rem;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+    }
+
+    .board-cards {
+      display: flex;
+      gap: 15px;
+      min-height: 140px;
+      align-items: center;
+      justify-content: center;
+      margin: 20px 0;
+    }
+
+    .card {
+      width: 90px;
+      height: 130px;
+      background: white;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 8px;
+      font-weight: bold;
+      font-size: 1.2rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+
+    .card.red { color: #dc2626; }
+    .card.black { color: #1e293b; }
+
+    .card-top { align-self: flex-start; line-height: 1; }
+    .card-center { align-self: center; font-size: 2rem; }
+    .card-bottom { align-self: flex-end; line-height: 1; transform: rotate(180deg); }
+
+    .players-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .player-card {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    .player-card.folded {
+      opacity: 0.4;
+    }
+
+    .player-name {
+      font-weight: bold;
+      font-size: 1.1rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .player-role {
+      font-size: 0.75rem;
+      background: #9333ea;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: normal;
+    }
+
+    .player-points {
+      font-size: 0.85rem;
+      color: #ffd700;
+    }
+
+    .winner-box {
+      background: linear-gradient(135deg, #b45309 0%, #78350f 100%);
+      border: 2px solid #f59e0b;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .top10-container {
+      margin-top: 15px;
+    }
+
+    .top10-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 8px;
+    }
+
+    .top10-table th, .top10-table td {
+      padding: 6px 8px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .top10-table th { color: #ffd700; }
+
+    .top10-filter {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    .btn-filter {
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      background: #334155;
+      border: none;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-filter.active { background: #2563eb; }
+
+    .qr-box {
+      margin-top: 15px;
+      text-align: center;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .qr-box img {
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
 </head>
 <body>
 
-  <!-- Header -->
   <header>
-    <div class="header-content">
-      <button class="hamburger-btn" id="hamburgerBtn" aria-label="Meny">
-        ☰
-      </button>
-      <h1>Løland Gård Poker</h1>
-    </div>
-
-    <!-- Dropdown meny -->
-    <nav class="nav-menu" id="navMenu">
-      <ul>
-        <li><a href="#" id="menuTop10">📊 Topp 10-lister</a></li>
-        <li><a href="#" id="menuNotes">📝 Kveldsnotater / Dagbok</a></li>
-        <li><a href="#" id="menuExport">📥 Eksporter Rådata til Excel (CSV)</a></li>
-        <li><a href="#" id="menuArchive">📜 Historisk Arkiv</a></li>
-        <li><a href="#" id="menuAbout">ℹ️ Om spillet</a></li>
-        <li><a href="#" id="menuGuide">📖 Brukerveiledning</a></li>
-      </ul>
-    </nav>
-    
-    <!-- Top Controls -->
-    <div class="top-controls">
-      <div class="control-group">
-        <label for="hostSelect">🏡 Vert:</label>
-        <select id="hostSelect">
-          <option value="Odd Christian" selected>Odd Christian</option>
-          <option value="Einar">Einar</option>
-          <option value="Kai">Kai</option>
-          <option value="Ronny">Ronny</option>
-          <option value="Joakim">Joakim</option>
-        </select>
-      </div>
+    <h1>Løland Gård Poker</h1>
+    <div class="gamenight-info">
+      <div id="dispHost">Vert: Ikke satt</div>
+      <div id="dispLocation">Sted: Ikke satt</div>
     </div>
   </header>
 
-  <!-- Winner Banner -->
-  <div class="status-banner" id="winnerText">
-    Venter på spillere...
-  </div>
-
-  <!-- Main Content Layout -->
-  <div class="table-container">
-    
-    <!-- Poker Table Felt -->
-    <div class="poker-table">
-      
-      <div class="table-header-info" id="gameModeText">
-        MODUS: IKKE VALGT | FASE: VENTING
+  <div class="main-layout">
+    <!-- VENSTRE SIDEBAR: KONTROLLER & TOPP 10 -->
+    <div class="controls-panel panel">
+      <h3>Spillmodus</h3>
+      <div class="mode-selection">
+        <button id="btnTexas" class="btn btn-mode">Texas</button>
+        <button id="btnOmaha" class="btn btn-mode">Omaha</button>
       </div>
 
-      <!-- Felleskort -->
-      <div class="community-cards" id="communityCardsContainer"></div>
+      <button id="btnStartHand" class="btn btn-action">Start Ny Hånd</button>
+      <button id="btnNextPhase" class="btn btn-next">Neste Fase</button>
 
-      <!-- Spillere -->
-      <div class="players-grid" id="playersGridContainer"></div>
+      <hr style="border-color: rgba(255,255,255,0.1); width: 100%; margin: 10px 0;">
 
-    </div>
+      <a href="/board.html" target="_blank" class="btn btn-secondary" style="text-decoration: none; text-align: center;">Åpne Bordvisning (Storskjerm)</a>
 
-    <!-- Sidebar Right -->
-    <div class="sidebar">
-      <div class="qr-box">
-        <p><strong>Skann for å bli med:</strong></p>
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pokergjengen.onrender.com/mobile.html" alt="QR Code til mobilvisning">
-      </div>
-
-      <a href="board.html" target="_blank" class="btn btn-orange" style="text-decoration: none;">💻 Åpne Bordvisning</a>
-      <button class="btn btn-blue" id="btnNextRound">Ny Runde / Neste Fase</button>
-    </div>
-
-  </div>
-
-  <!-- Bottom Control Bar -->
-  <div class="bottom-bar">
-    <button class="btn-small" id="btnTexas">Texas Hold'em</button>
-    <button class="btn-small" id="btnOmaha">Omaha</button>
-    <button class="btn-small" id="btnStartHand">Start Ny Hånd</button>
-  </div>
-
-  <!-- ==========================================
-       MODAL 1: TOPP 10-LISTER
-       ========================================== -->
-  <div class="modal-overlay" id="top10Modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>📊 Flernivå Topp 10 (Showdown)</h2>
-        <button class="modal-close" onclick="closeModal('top10Modal')">&times;</button>
-      </div>
-      <div class="modal-tabs">
-        <button class="tab-btn active" onclick="switchTop10Tab('tonight')">Kveldens</button>
-        <button class="tab-btn" onclick="switchTop10Tab('month')">Månedens</button>
-        <button class="tab-btn" onclick="switchTop10Tab('year')">Årets</button>
-        <button class="tab-btn" onclick="switchTop10Tab('alltime')">Evig (All-Time)</button>
-      </div>
-      <div id="top10Content">
-        <table class="modal-table">
+      <!-- TOPP 10 LISTE -->
+      <div class="top10-container">
+        <h4 style="margin: 0 0 8px 0; color: #ffd700;">Topp 10 Hender</h4>
+        <div class="top10-filter">
+          <button class="btn-filter active" onclick="loadTop10('tonight', this)">Kveld</button>
+          <button class="btn-filter" onclick="loadTop10('month', this)">Måned</button>
+          <button class="btn-filter" onclick="loadTop10('year', this)">År</button>
+          <button class="btn-filter" onclick="loadTop10('all', this)">Alt</button>
+        </div>
+        <table class="top10-table">
           <thead>
             <tr>
-              <th>#</th>
               <th>Spiller</th>
               <th>Hånd</th>
-              <th>Dato</th>
             </tr>
           </thead>
-          <tbody id="top10TableBody">
-            <tr><td colspan="4" style="text-align: center; color: #94a3b8;">Laster rangeringer...</td></tr>
+          <tbody id="top10Tbody">
+            <tr><td colspan="2">Laster data...</td></tr>
           </tbody>
         </table>
       </div>
+
+      <!-- ADMIN OG MOBIL INTEGRASJON -->
+      <div class="qr-box">
+        <p style="color: #000; margin: 0 0 5px 0; font-weight: bold; font-size: 0.8rem;">Skann for å bli med:</p>
+        <div id="qrcode"></div>
+      </div>
+    </div>
+
+    <!-- HØYRE HOVEDOMRÅDE: POKERBORD OG SPILLERE -->
+    <div class="poker-table-container panel">
+      <div id="phaseBadge" class="phase-badge">VENTER PÅ START</div>
+
+      <!-- BORDFELT (FLOP / TURN / RIVER) -->
+      <div id="boardCards" class="board-cards"></div>
+
+      <!-- VINNERINFO DERSOM DET FINNES -->
+      <div id="winnerBox" class="winner-box" style="display: none;">
+        <h3 id="winnerTitle" style="margin: 0 0 5px 0;"></h3>
+        <p id="winnerDescr" style="margin: 0; font-size: 1.1rem;"></p>
+      </div>
+
+      <!-- SPILLERLISTE -->
+      <h3 style="align-self: flex-start; margin: 20px 0 5px 0;">Spillere ved bordet</h3>
+      <div id="playersGrid" class="players-grid"></div>
     </div>
   </div>
 
-  <!-- ==========================================
-       MODAL 2: BRUKERVEILEDNING
-       ========================================== -->
-  <div class="modal-overlay" id="guideModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>📖 Brukerveiledning</h2>
-        <button class="modal-close" onclick="closeModal('guideModal')">&times;</button>
-      </div>
-      <div class="guide-section">
-        <h3>1. Oppstart & Spillere</h3>
-        <ul>
-          <li><strong>QR-kode:</strong> Spillere skanner QR-koden på skjermen for å koble til via sin mobil.</li>
-          <li><strong>Gjenkjenning:</strong> Mobilen husker profilvalget slik at re-tilkobling skjer automatisk.</li>
-        </ul>
-
-        <h3>2. Dealer-Dashboard (Storskjerm)</h3>
-        <ul>
-          <li><strong>Velg Modus:</strong> Bruk knappene i bunnfeltet for å veksle mellom Texas Hold'em og Omaha.</li>
-          <li><strong>Start Ny Hånd:</strong> Genererer ny kortstokk, stokker, flytter dealer-knappen og deler ut private kort til mobilene.</li>
-          <li><strong>Ny Runde / Neste Fase:</strong> Flytter spillet gjennom Preflop, Flop, Turn, River og Showdown.</li>
-        </ul>
-
-        <h3>3. Showdown & Diplom</h3>
-        <ul>
-          <li>Ved <strong>Showdown</strong> evalueres alle hender automatisk, og vinneren tildeles poeng på storskjermen.</li>
-          <li>Sjeldne hender (Fire like eller bedre) utløser automatisk diplom og feiring!</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==========================================
-       JAVASCRIPT CARD RENDER MODULE & SOCKET SYNC
-       ========================================== -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
     const socket = io();
 
-    // 1. Hamburgermeny toggle
-    const hamburgerBtn = document.getElementById('hamburgerBtn');
-    const navMenu = document.getElementById('navMenu');
-
-    if (hamburgerBtn && navMenu) {
-      hamburgerBtn.addEventListener('click', () => {
-        navMenu.classList.toggle('open');
-      });
-    }
-
-    // 2. Modal Styring
-    function openModal(modalId) {
-      const modal = document.getElementById(modalId);
-      if (modal) {
-        modal.classList.add('active');
-        if (navMenu) navMenu.classList.remove('open');
-      }
-    }
-
-    function closeModal(modalId) {
-      const modal = document.getElementById(modalId);
-      if (modal) {
-        modal.classList.remove('active');
-      }
-    }
-
-    window.addEventListener('click', (e) => {
-      if (e.target.classList.contains('modal-overlay')) {
-        e.target.classList.remove('active');
-      }
+    // QR-Kode Generering for mobilskjerm
+    new QRCode(document.getElementById("qrcode"), {
+      text: window.location.origin + "/mobile.html",
+      width: 120,
+      height: 120
     });
 
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-      }
+    // ELEMENT-REFERANSER
+    const btnTexas = document.getElementById('btnTexas');
+    const btnOmaha = document.getElementById('btnOmaha');
+    const btnStartHand = document.getElementById('btnStartHand');
+    const btnNextPhase = document.getElementById('btnNextPhase');
+    const phaseBadge = document.getElementById('phaseBadge');
+    const boardCardsDiv = document.getElementById('boardCards');
+    const playersGrid = document.getElementById('playersGrid');
+    const winnerBox = document.getElementById('winnerBox');
+    const winnerTitle = document.getElementById('winnerTitle');
+    const winnerDescr = document.getElementById('winnerDescr');
+
+    // SOCKET EVENTS (KNAPPER)
+    btnTexas.addEventListener('click', () => {
+      socket.emit('set_game_mode', 'TEXAS');
     });
 
-    document.getElementById('menuTop10')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      openModal('top10Modal');
-      socket.emit('get_top10', { period: 'tonight' });
+    btnOmaha.addEventListener('click', () => {
+      socket.emit('set_game_mode', 'OMAHA');
     });
 
-    document.getElementById('menuGuide')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      openModal('guideModal');
+    btnStartHand.addEventListener('click', () => {
+      socket.emit('start_new_hand');
     });
 
-    function switchTop10Tab(period) {
-      const tabs = document.querySelectorAll('.modal-tabs .tab-btn');
-      tabs.forEach(tab => tab.classList.remove('active'));
-      event.target.classList.add('active');
-
-      document.getElementById('top10TableBody').innerHTML = '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Henter data...</td></tr>';
-      socket.emit('get_top10', { period: period });
-    }
-
-    socket.on('top10_data', (data) => {
-      const tbody = document.getElementById('top10TableBody');
-      if (!tbody) return;
-
-      if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Ingen hender registrert i denne perioden enda.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = data.map((item, index) => `
-        <tr>
-          <td><strong>${index + 1}</strong></td>
-          <td>${item.playerName || 'Ukjent'}</td>
-          <td>${item.handDescr || '-'}</td>
-          <td>${item.date || '-'}</td>
-        </tr>
-      `).join('');
+    btnNextPhase.addEventListener('click', () => {
+      socket.emit('next_phase');
     });
 
-    // 3. Oversettelse av kort fra backend
-    function parseCardString(cardStr) {
-      if (!cardStr || typeof cardStr !== 'string' || cardStr.length < 2) return null;
-      let val = cardStr.charAt(0);
-      let suit = cardStr.charAt(1);
+    // PARSING OG VISNING AV KORT
+    function formatCard(cardCode) {
+      if (!cardCode) return '';
+      let rawVal = cardCode.slice(0, -1).toUpperCase();
+      let displayVal = rawVal === 'T' ? '10' : rawVal;
+      const suitChar = cardCode.slice(-1).toLowerCase();
 
-      if (val === 'T') val = '10';
+      const suits = {
+        'h': { symbol: '♥', color: 'red' },
+        'd': { symbol: '♦', color: 'red' },
+        'c': { symbol: '♣', color: 'black' },
+        's': { symbol: '♠', color: 'black' }
+      };
 
-      return { val, suit };
-    }
-
-    function getSuitSymbol(suit) {
-      const s = String(suit || '').toLowerCase();
-      if (s === 'h' || s === '♥') return '♥';
-      if (s === 'd' || s === '♦') return '♦';
-      if (s === 's' || s === '♠') return '♠';
-      if (s === 'c' || s === '♣') return '♣';
-      return suit || '';
-    }
-
-    function getSuitClass(suit) {
-      const s = String(suit || '').toLowerCase();
-      if (s === 'h' || s === '♥') return 'hearts';
-      if (s === 'd' || s === '♦') return 'diamonds';
-      if (s === 's' || s === '♠') return 'spades';
-      return 'clubs';
-    }
-
-    function createCardHTML(cardStr) {
-      const parsed = parseCardString(cardStr);
-      if (!parsed) return `<div class="card card-back"></div>`;
-
-      const suitClass = getSuitClass(parsed.suit);
-      const symbol = getSuitSymbol(parsed.suit);
-      const val = parsed.val;
+      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
 
       return `
-        <div class="card ${suitClass}">
-          <div class="card-corner top-left">
-            <span class="card-value">${val}</span>
-            <span class="card-suit">${symbol}</span>
-          </div>
-          <div class="card-corner bottom-right">
-            <span class="card-value">${val}</span>
-            <span class="card-suit">${symbol}</span>
-          </div>
+        <div class="card ${suit.color}">
+          <div class="card-top">${displayVal} ${suit.symbol}</div>
+          <div class="card-center">${suit.symbol}</div>
+          <div class="card-bottom">${displayVal} ${suit.symbol}</div>
         </div>
       `;
     }
 
-    // 4. Render bordet
-    socket.on('state_update', (data) => {
-      if (!data) return;
+    // STATE UPDATE LYTTER
+    socket.on('state_update', (state) => {
+      // Oppdater knappestatus for modus
+      btnTexas.classList.toggle('active', state.gameMode === 'TEXAS');
+      btnOmaha.classList.toggle('active', state.gameMode === 'OMAHA');
 
-      const winnerBanner = document.getElementById('winnerText');
-      if (winnerBanner) {
-        if (data.winnerInfo) {
-          winnerBanner.textContent = `🏆 VINNER: ${data.winnerInfo.winnerName} (${data.winnerInfo.descr})`;
-        } else if (data.players && data.players.length > 0) {
-          winnerBanner.textContent = `Tilkoblede spillere: ${data.players.length}`;
-        } else {
-          winnerBanner.textContent = 'Venter på spillere...';
-        }
+      // Oppdater fase
+      phaseBadge.innerText = state.phase || 'VENTING';
+
+      // Oppdater felleskort (board)
+      if (state.board && state.board.length > 0) {
+        boardCardsDiv.innerHTML = state.board.map(c => formatCard(c)).join('');
+      } else {
+        boardCardsDiv.innerHTML = '<span style="color: #666;">Ingen kort på bordet</span>';
       }
 
-      const modeText = document.getElementById('gameModeText');
-      if (modeText) {
-        const mode = data.gameMode || data.mode || 'IKKE VALGT';
-        const phase = data.phase || 'VENTING';
-        modeText.textContent = `MODUS: ${mode.toUpperCase()} | FASE: ${phase.toUpperCase()}`;
+      // Oppdater spillernatt-info
+      if (state.gameNight) {
+        document.getElementById('dispHost').innerText = `Vert: ${state.gameNight.host || 'Ikke satt'}`;
+        document.getElementById('dispLocation').innerText = `Sted: ${state.gameNight.location || 'Ikke satt'}`;
       }
 
-      const communityContainer = document.getElementById('communityCardsContainer');
-      if (communityContainer) {
-        const boardCards = Array.isArray(data.board) ? data.board : [];
-        communityContainer.innerHTML = boardCards.map(card => createCardHTML(card)).join('');
+      // Oppdater vinnerinfo
+      if (state.winnerInfo) {
+        winnerBox.style.display = 'block';
+        winnerTitle.innerText = `Vinner: ${state.winnerInfo.winnerName}`;
+        winnerDescr.innerText = state.winnerInfo.descr;
+      } else {
+        winnerBox.style.display = 'none';
       }
 
-      const playersContainer = document.getElementById('playersGridContainer');
-      if (playersContainer) {
-        const players = Array.isArray(data.players) ? data.players : [];
-        
-        if (players.length === 0) {
-          playersContainer.innerHTML = '<div style="color: #ccc; font-style: italic;">Ingen spillere tilkoblet</div>';
-        } else {
-          playersContainer.innerHTML = players.map((player, idx) => {
-            const statusText = player.connected !== false ? (player.folded ? '🔴 KASTET' : '🟢 INNE') : '⚪ FRAKOBLET';
-            const cardsHTML = (player.cards || []).map(card => createCardHTML(card)).join('');
+      // Oppdater spillere
+      playersGrid.innerHTML = '';
+      if (state.players && state.players.length > 0) {
+        state.players.forEach(p => {
+          const div = document.createElement('div');
+          div.className = `player-card ${p.folded ? 'folded' : ''}`;
+          
+          let roleTag = p.role ? `<span class="player-role">${p.role}</span>` : '';
+          let cardMarkup = (p.cards && p.cards.length > 0) 
+            ? `<div style="display: flex; gap: 5px; margin-top: 5px;">${p.cards.map(c => formatCard(c)).join('')}</div>`
+            : '';
 
-            return `
-              <div class="player-box ${player.folded ? 'player-folded' : ''}">
-                <div class="player-info">
-                  <div class="player-name">${player.name || 'Ukjent'}</div>
-                  <div class="player-meta">Plass ${player.seat || idx + 1} | Poeng: ${player.points || 1000}</div>
-                  ${player.role ? `<span class="player-badge">${player.role}</span>` : ''}
-                  <div class="player-meta" style="font-weight: bold; margin-top: 4px;">
-                    ${statusText}
-                  </div>
-                </div>
-                <div class="player-cards-container">
-                  ${cardsHTML}
-                </div>
-              </div>
-            `;
-          }).join('');
-        }
+          div.innerHTML = `
+            <div class="player-name">
+              <span>${p.name}</span>
+              ${roleTag}
+            </div>
+            <div class="player-points">Poeng: ${p.points || 0}</div>
+            ${p.folded ? '<span style="color: #ef4444; font-size: 0.8rem;">Folded</span>' : ''}
+            ${cardMarkup}
+          `;
+          playersGrid.appendChild(div);
+        });
+      } else {
+        playersGrid.innerHTML = '<div style="color: #aaa; grid-column: 1/-1;">Ingen spillere tilkoblet enda.</div>';
       }
     });
 
-    // 5. Knappehandlinger - sender flere varianter for kompatibilitet med backend
-    document.getElementById('hostSelect')?.addEventListener('change', (e) => {
-      socket.emit('set_gamenight', { host: e.target.value });
-      socket.emit('set_host', e.target.value);
+    // TOPP 10 LOGIKK
+    function loadTop10(period, btnElement) {
+      if (btnElement) {
+        document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+        btnElement.classList.add('active');
+      }
+      socket.emit('get_top10', { period: period });
+    }
+
+    socket.on('top10_data', (data) => {
+      const tbody = document.getElementById('top10Tbody');
+      tbody.innerHTML = '';
+
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="2">Ingen resultater</td></tr>';
+        return;
+      }
+
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${row.playerName}</strong></td>
+          <td>${row.handDescr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
     });
 
-    document.getElementById('btnTexas')?.addEventListener('click', () => {
-      socket.emit('set_game_mode', 'TEXAS');
-      socket.emit('set_mode', 'TEXAS');
-      socket.emit('select_mode', 'TEXAS');
-    });
-
-    document.getElementById('btnOmaha')?.addEventListener('click', () => {
-      socket.emit('set_game_mode', 'OMAHA');
-      socket.emit('set_mode', 'OMAHA');
-      socket.emit('select_mode', 'OMAHA');
-    });
-
-    document.getElementById('btnStartHand')?.addEventListener('click', () => {
-      socket.emit('start_new_hand');
-      socket.emit('start_hand');
-      socket.emit('deal_cards');
-    });
-
-    document.getElementById('btnNextRound')?.addEventListener('click', () => {
-      socket.emit('next_phase');
-      socket.emit('next_round');
-    });
+    // Last inn første topp 10 liste ved start
+    loadTop10('tonight');
   </script>
 </body>
 </html>
