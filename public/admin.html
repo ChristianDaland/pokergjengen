@@ -1,144 +1,119 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hybrid Poker - Admin Kontrollpanel</title>
-    <script src="/socket.io/socket.io.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
-            margin: 0;
-            padding: 20px;
-        }
-        h1, h2, h3 { color: #f0883e; }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .card-panel {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #444;
-        }
-        button {
-            background-color: #0d6efd;
-            color: white;
-            border: none;
-            padding: 12px 18px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-        button:hover { opacity: 0.9; }
-        button.success { background-color: #28a745; }
-        button.warning { background-color: #ffc107; color: #000; }
-        button.danger { background-color: #dc3545; }
-        select, input[type="number"] {
-            width: 100%;
-            padding: 10px;
-            font-size: 16px;
-            margin-bottom: 15px;
-            background: #1a1a1a;
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        ul { list-style-type: none; padding: 0; }
-        li { padding: 8px; background: #333; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Løland Gård Poker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121824;
+      color: #fff;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1, h2 { color: #4a90e2; }
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #334155;
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 65%;
+      border-radius: 4px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: white;
+    }
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-add { background: #10b981; color: white; }
+    .btn-delete { background: #ef4444; color: white; padding: 5px 10px; margin-left: 10px; }
+    .btn-danger { background: #dc2626; color: white; width: 100%; padding: 15px; font-size: 16px; margin-top: 10px; }
+    ul { list-style: none; padding: 0; }
+    li {
+      padding: 10px 0;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
-<h1>🎛️ Spillleder Kontrollpanel (Admin)</h1>
+  <h1>🔒 Poker Admin Panel</h1>
 
-<div class="grid">
-    <!-- Panel 1: Spillinnstillinger -->
-    <div class="card-panel">
-        <h2>1. Spillinnstillinger</h2>
-        <label for="gameTypeSelect">Velg Spilltype:</label>
-        <select id="gameTypeSelect" onchange="updateGameType()">
-            <option value="Texas Hold'em">Texas Hold'em (2 kort)</option>
-            <option value="Omaha Poker">Omaha Poker (4 kort)</option>
-            <option value="5-Card Omaha">5-Card Omaha (5 kort)</option>
-            <option value="Courchevel">Courchevel</option>
-        </select>
-
-        <button class="success" onclick="startNewRound()">♠️ Start Ny Runde (Del ut kort)</button>
+  <!-- SPILLEDER-ADMINISTRASJON -->
+  <div class="card">
+    <h2>Administrer Spillere</h2>
+    <div style="margin-bottom: 15px;">
+      <input type="text" id="newPlayerName" placeholder="Skriv inn nytt spillernavn...">
+      <button class="btn-add" onclick="addPlayer()">Legg til</button>
     </div>
+    <ul id="playerList"></ul>
+  </div>
 
-    <!-- Panel 2: Felleskort & Runde-styring -->
-    <div class="card-panel">
-        <h2>2. Felleskort (Board)</h2>
-        <button class="warning" onclick="dealCommunity(3)">Del Flop (3 kort)</button>
-        <button class="warning" onclick="dealCommunity(1)">Del Turn / River (1 kort)</button>
-        
-        <hr style="border-color:#444; margin: 15px 0;">
+  <!-- FARESONE: TØMMING AV DATA -->
+  <div class="card" style="border-color: #ef4444;">
+    <h2 style="color: #ef4444;">⚠️ Faresone</h2>
+    <p>Dette vil permanent slette all håndhistorikk / Topp 10 data fra databasen.</p>
+    <button class="btn-danger" onclick="clearHistory()">TØM HÅNDHISTORIKK (TOPP 10)</button>
+  </div>
 
-        <button class="danger" onclick="triggerShowdown()">🏆 Kjør Showdown / Avslutt Runde</button>
-    </div>
-
-    <!-- Panel 3: Status & Spillere -->
-    <div class="card-panel">
-        <h2>3. Bordstatus</h2>
-        <p><strong>Aktivt spill:</strong> <span id="currentGameType">-</span></p>
-        <p><strong>Pott:</strong> <span id="currentPot">0</span> pt</p>
-        <p><strong>Felleskort spilt:</strong> <span id="currentCommunity">-</span></p>
-        
-        <h3>Tilkoblede Spillere (<span id="playerCount">0</span>)</h3>
-        <ul id="adminPlayersList"></ul>
-    </div>
-</div>
-
-<script>
+  <script>
     const socket = io();
 
-    function updateGameType() {
-        const selectedType = document.getElementById('gameTypeSelect').value;
-        socket.emit('update_settings', { gameType: selectedType });
-    }
+    // Hent spillere ved oppstart
+    socket.emit('admin_get_players');
 
-    function startNewRound() {
-        socket.emit('start_round');
-    }
-
-    function dealCommunity(count) {
-        socket.emit('deal_community', count);
-    }
-
-    function triggerShowdown() {
-        if (confirm("Er du sikker på at du vil avslutte runden og beregne vinner?")) {
-            socket.emit('showdown');
-        }
-    }
-
-    socket.on('state_update', (state) => {
-        document.getElementById('currentGameType').innerText = state.gameType;
-        document.getElementById('currentPot').innerText = state.pot;
-        document.getElementById('gameTypeSelect').value = state.gameType;
-
-        const cardsText = state.communityCards.map(c => `${c.value}${c.suit}`).join(' ') || 'Ingen';
-        document.getElementById('currentCommunity').innerText = cardsText;
-
-        const playersList = document.getElementById('adminPlayersList');
-        document.getElementById('playerCount').innerText = state.players.length;
-        playersList.innerHTML = '';
-        
-        state.players.forEach(p => {
-            const li = document.createElement('li');
-            li.innerHTML = `<span><strong>${p.name}</strong></span> <span>${p.folded ? '<span style="color:#dc3545;">(Folded)</span>' : '<span style="color:#28a745;">(Aktiv)</span>'}</span>`;
-            playersList.appendChild(li);
-        });
+    socket.on('admin_players_list', (players) => {
+      const list = document.getElementById('playerList');
+      list.innerHTML = '';
+      players.forEach(p => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>${p.name}</span>
+          <button class="btn-delete" onclick="deletePlayer(${p.id})">Slett</button>
+        `;
+        list.appendChild(li);
+      });
     });
-</script>
+
+    function addPlayer() {
+      const input = document.getElementById('newPlayerName');
+      const name = input.value.trim();
+      if (name) {
+        socket.emit('admin_add_player', name);
+        input.value = '';
+      }
+    }
+
+    function deletePlayer(id) {
+      if (confirm('Er du sikker på at du vil slette denne spilleren?')) {
+        socket.emit('admin_delete_player', id);
+      }
+    }
+
+    function clearHistory() {
+      if (confirm('ER DU SIKKER? Dette vil slette all Topp 10 historikk permanent!')) {
+        socket.emit('admin_clear_history');
+      }
+    }
+
+    socket.on('admin_action_success', (msg) => {
+      alert(msg);
+    });
+  </script>
 </body>
 </html>
