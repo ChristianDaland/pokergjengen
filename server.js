@@ -58,21 +58,10 @@ async function initDB() {
   }
 }
 initDB();
+// -----------------------------------
 
 app.use(express.static('public'));
 
-// REST API-endepunkt for å hente spillere
-app.get('/api/players', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT name FROM players ORDER BY id ASC');
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Feil ved REST API /api/players:", err);
-    res.json(DEFAULT_PLAYERS.map(name => ({ name })));
-  }
-});
-
-// --- KORTSTOKK OG SPILLOGIKK ---
 const SUITS = ['c', 'd', 'h', 's'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
@@ -115,11 +104,15 @@ function translateHandDescription(descr) {
   return text;
 }
 
+// Beregner en unikk og sammenlignbar poengsum med vanlige tall
 function calculateHandScore(solvedHand) {
   if (!solvedHand) return 0;
+
+  // Hovedkategori (0-9) vektes høyest (f.eks. 9 * 10 000 000)
   let rank = Number(solvedHand.rank) || 0;
   let score = rank * 10000000;
 
+  // pokersolver returnerer 'values' i synkende rekkefølge
   if (solvedHand.values && Array.isArray(solvedHand.values)) {
     let multiplier = 100000;
     for (let val of solvedHand.values) {
@@ -127,6 +120,7 @@ function calculateHandScore(solvedHand) {
       multiplier = Math.floor(multiplier / 15);
     }
   }
+
   return Math.floor(score);
 }
 
@@ -234,17 +228,12 @@ async function sendPresetPlayers(targetSocket = null) {
     const playerNames = res.rows.map(r => r.name);
     if (targetSocket) {
       targetSocket.emit('preset_players', playerNames);
-      targetSocket.emit('registered_players_list', playerNames);
     } else {
       io.emit('preset_players', playerNames);
-      io.emit('registered_players_list', playerNames);
     }
   } catch (err) {
     console.error("Feil ved henting av spillere:", err);
-    if (targetSocket) {
-      targetSocket.emit('preset_players', DEFAULT_PLAYERS);
-      targetSocket.emit('registered_players_list', DEFAULT_PLAYERS);
-    }
+    if (targetSocket) targetSocket.emit('preset_players', DEFAULT_PLAYERS);
   }
 }
 
@@ -271,9 +260,6 @@ function formatToNorwegianTime(dateInput) {
 
 io.on('connection', (socket) => {
   sendPresetPlayers(socket);
-
-  socket.on('get_preset_players', () => sendPresetPlayers(socket));
-  socket.on('get_registered_players', () => sendPresetPlayers(socket));
 
   socket.on('join_game', (name) => {
     const cleanName = name ? name.trim() : 'Spiller';
@@ -317,7 +303,6 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
-  // HÅNDTERING AV TEXAS / OMAHA KNAPPER
   socket.on('set_game_mode', (mode) => {
     gameState.gameMode = mode;
     if (!mode) {
@@ -330,7 +315,6 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
-  // HÅNDTERING AV "START NY HÅND" KNAPP
   socket.on('start_new_hand', () => {
     startNewHandLogic();
     updateAll();
@@ -339,12 +323,14 @@ io.on('connection', (socket) => {
   socket.on('next_phase', async () => {
     const activePlayers = Object.values(players).filter(p => !p.folded);
 
+    // Hvis spillet er ferdig eller i Showdown, vil neste klikk alltid starte en ny hånd
     if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
       startNewHandLogic();
       updateAll();
       return;
     }
 
+    // Hvis alle unntatt én har kastet seg
     if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
       gameState.phase = 'FINISHED';
       gameState.winnerInfo = {
@@ -357,6 +343,7 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Stegvis utdeling av bordkort
     if (gameState.phase === 'PREFLOP') {
       gameState.phase = 'FLOP';
       gameState.board = [gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop()];
@@ -395,6 +382,7 @@ io.on('connection', (socket) => {
         const rawDescr = topWinner && topWinner.solved ? topWinner.solved.descr : 'Ukjent hånd';
         const translatedHand = translateHandDescription(rawDescr);
         
+        // Trygg henting og konvertering av tallverdier
         const handRank = (topWinner && topWinner.solved && topWinner.solved.rank) ? Number(topWinner.solved.rank) : 0;
         const handScore = topWinner && topWinner.solved ? calculateHandScore(topWinner.solved) : 0;
 
@@ -404,14 +392,15 @@ io.on('connection', (socket) => {
           foldedWin: false
         };
 
+        // Lagre i databasen og skriv ut status i loggen
         const insertRes = await pool.query(
           'INSERT INTO hand_history (player, hand, hand_rank, hand_score, game_mode) VALUES ($1, $2, $3, $4, $5) RETURNING id',
           [winnerText, translatedHand, handRank, handScore, gameState.gameMode || 'TEXAS']
         );
-        console.log(`[DB] Ny hånd registrert! ID: ${insertRes.rows[0].id}, Vinner: ${winnerText}`);
+        console.log(`[DB] Ny hånd registrert i historikk! ID: ${insertRes.rows[0].id}, Vinner: ${winnerText}, Poeng: ${handScore}`);
 
       } catch (err) {
-        console.error("Feil under SHOWDOWN evaluering:", err);
+        console.error("Feil under evaluering av SHOWDOWN / DB-lagring:", err);
       }
     }
     
@@ -439,14 +428,17 @@ io.on('connection', (socket) => {
     const rawPeriod = (data && data.period) ? String(data.period).toLowerCase() : 'tonight';
     let timeQuery = '';
 
+    // Tilpasset støtte for alle mulige strenger fra frontend
     if (rawPeriod === 'tonight' || rawPeriod === 'kveld' || rawPeriod === 'kveldens') {
       timeQuery = "WHERE created_at >= NOW() - INTERVAL '24 hours'";
     } else if (rawPeriod === 'month' || rawPeriod === 'måned' || rawPeriod === 'månedens') {
       timeQuery = "WHERE created_at >= NOW() - INTERVAL '30 days'";
     } else if (rawPeriod === 'year' || rawPeriod === 'år' || rawPeriod === 'årets') {
       timeQuery = "WHERE created_at >= NOW() - INTERVAL '1 year'";
+    } else if (rawPeriod === 'all' || rawPeriod === 'ever' || rawPeriod === 'evig') {
+      timeQuery = ""; // Henter alt
     } else {
-      timeQuery = "";
+      timeQuery = ""; // Default fallback: Hent alt dersom periode-nøkkelen er ukjent
     }
 
     try {
@@ -466,7 +458,7 @@ io.on('connection', (socket) => {
 
       socket.emit('top10_data', formattedRows);
     } catch (err) {
-      console.error("Feil ved henting av Topp 10:", err);
+      console.error("Feil ved henting av Topp 10 fra DB:", err);
       socket.emit('top10_data', []);
     }
   });
